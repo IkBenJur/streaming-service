@@ -25,3 +25,6 @@ bin/
 # OS
 .DS_Store
 Thumbs.db
+
+/go/files
+/test-files

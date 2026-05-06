@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,6 +25,11 @@ func run(ctx context.Context) error {
 			"message": "OK",
 		})
 	})
+
+	router.MaxMultipartMemory = 8 << 20
+
+	videoProcessingHandler := videoProcessing.NewHandler(nil)
+	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 
 	srv := &http.Server{
 		Addr:    ":8080",
