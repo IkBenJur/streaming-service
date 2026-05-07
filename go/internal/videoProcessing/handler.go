@@ -3,7 +3,9 @@ package videoProcessing
 import (
 	"net/http"
 	"path/filepath"
+	"strings"
 
+	"github.com/IkBenJur/streaming-service/internal/json"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,16 +26,27 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	// TODO Reject wrong file types
+	filenameParts := strings.Split(file.Filename, ".")
+	if len(filenameParts) < 1 {
+		json.WriteError(c, http.StatusBadRequest, "unable to find file extension")
+		return
+	}
+
+	fileExtension := filenameParts[len(filenameParts)-1]
+	invalidFileType := fileExtension != "webm" && fileExtension != "mp4"
+	if invalidFileType {
+		json.WriteError(c, http.StatusBadRequest, "supported file formats are webm or mp4")
+		return
+	}
 
 	// TODO Trancode using FFMPEG
 
 	// TODO Save to COS
 
-	dst := filepath.Join("./files/", filepath.Base("new-file-name.txt"))
+	dst := filepath.Join("./files/", filepath.Base("new-file-name.webm"))
 	err = c.SaveUploadedFile(file, dst)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		json.WriteError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
