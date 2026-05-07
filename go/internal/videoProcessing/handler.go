@@ -43,7 +43,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 
 	// TODO Save to COS
 
-	dst := filepath.Join("./files/", filepath.Base("new-file-name.webm"))
+	dst := filepath.Join("./files/", filepath.Base("new-file-name."), fileExtension)
 	err = c.SaveUploadedFile(file, dst)
 	if err != nil {
 		json.WriteError(c, http.StatusBadRequest, err.Error())
