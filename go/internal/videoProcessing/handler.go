@@ -2,6 +2,7 @@ package videoProcessing
 
 import (
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -51,4 +52,26 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "file uploaded"})
+}
+
+func (h *Handler) StreamVideo(c *gin.Context) {
+	fileName := c.Param("fileName")
+
+	// Sanatize name
+	fileName = filepath.Base(fileName)
+
+	filePath := filepath.Join("./files/", fileName)
+	file, err := os.Open(filePath)
+	if err != nil {
+		json.WriteError(c, http.StatusNotFound, "video not found")
+		return
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		json.WriteError(c, http.StatusInternalServerError, "could not stat file")
+	}
+
+	http.ServeContent(c.Writer, c.Request, stat.Name(), stat.ModTime(), file)
 }

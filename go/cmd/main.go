@@ -30,6 +30,7 @@ func run(ctx context.Context) error {
 
 	videoProcessingHandler := videoProcessing.NewHandler(nil)
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
+	router.GET("/stream-video/:fileName", videoProcessingHandler.StreamVideo)
 
 	srv := &http.Server{
 		Addr:    ":8080",
