@@ -20,6 +20,14 @@ func run(ctx context.Context) error {
 	slog.SetDefault(logger)
 
 	router := gin.Default()
+
+	// Ignore CORS for now
+	// TODO SETUP CORS
+	router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Next()
+	})
+
 	router.GET("/health", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"message": "OK",
@@ -28,7 +36,7 @@ func run(ctx context.Context) error {
 
 	router.MaxMultipartMemory = 8 << 20
 
-	videoProcessingHandler := videoProcessing.NewHandler(nil)
+	videoProcessingHandler := videoProcessing.NewHandler(videoProcessing.NewLocalStorage("./files"))
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 	router.GET("/stream-video/:fileName", videoProcessingHandler.StreamVideo)
 

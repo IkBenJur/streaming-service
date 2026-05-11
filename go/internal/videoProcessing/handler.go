@@ -1,9 +1,10 @@
 package videoProcessing
 
 import (
+	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/IkBenJur/streaming-service/internal/json"
@@ -60,18 +61,27 @@ func (h *Handler) StreamVideo(c *gin.Context) {
 	// Sanatize name
 	fileName = filepath.Base(fileName)
 
-	filePath := filepath.Join("./files/", fileName)
-	file, err := os.Open(filePath)
+	start, err := strconv.ParseInt(c.Query("start"), 10, 64)
 	if err != nil {
-		json.WriteError(c, http.StatusNotFound, "video not found")
+		json.WriteError(c, http.StatusBadRequest, "invalid start")
 		return
 	}
-	defer file.Close()
 
-	stat, err := file.Stat()
+	end, err := strconv.ParseInt(c.Query("end"), 10, 64)
 	if err != nil {
-		json.WriteError(c, http.StatusInternalServerError, "could not stat file")
+		json.WriteError(c, http.StatusBadRequest, "invalid end")
+		return
 	}
 
-	http.ServeContent(c.Writer, c.Request, stat.Name(), stat.ModTime(), file)
+	bytes, err := h.service.GetChunk(fileName, start, end)
+	if err != nil {
+		json.WriteError(c, http.StatusInternalServerError, "failed to get file")
+		return
+	}
+
+	c.Header("Content-Type", "video/webm")
+	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d", start, end))
+	c.Status(http.StatusPartialContent)
+	c.Writer.Write(bytes)
+
 }
