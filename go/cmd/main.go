@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func run(ctx context.Context) error {
@@ -15,6 +17,16 @@ func run(ctx context.Context) error {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+
+	// TODO Use env varaibles
+	conn, err := pgx.Connect(ctx, "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable")
+	if err != nil {
+		slog.Error("Failed DB connections", "error", err)
+		return err
+	}
+	defer conn.Close(ctx)
+
+	slog.Info("Connected to DB")
 
 	api := Application{
 		Port: "8080",
