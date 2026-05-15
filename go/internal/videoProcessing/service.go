@@ -1,11 +1,15 @@
 package videoProcessing
 
 import (
+	"mime/multipart"
 	"os"
 	"path/filepath"
+
+	"github.com/gin-gonic/gin"
 )
 
 type VideoProcessingService interface {
+	SaveFileToRawStorage(c *gin.Context, file *multipart.FileHeader, filename string) error
 	GetChunk(name string, start, end int64) ([]byte, error)
 }
 
@@ -17,6 +21,12 @@ func NewLocalStorage(basePath string) *LocalStorage {
 	return &LocalStorage{
 		basePath: basePath,
 	}
+}
+
+func (s *LocalStorage) SaveFileToRawStorage(c *gin.Context, file *multipart.FileHeader, filename string) error {
+	dst := filepath.Join(s.basePath, "raw", filename)
+	err := c.SaveUploadedFile(file, dst)
+	return err
 }
 
 func (s *LocalStorage) GetChunk(name string, start, end int64) ([]byte, error) {

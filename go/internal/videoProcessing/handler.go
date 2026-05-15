@@ -2,6 +2,7 @@ package videoProcessing
 
 import (
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -24,35 +25,38 @@ func NewHandler(service VideoProcessingService) *Handler {
 func (h *Handler) UploadVideo(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		json.WriteError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
+	fileExtension, err := validateFileAndGetFileExtension(file)
+	if err != nil {
+		json.WriteError(c, http.StatusBadRequest, err.Error())
+	}
+
+	// TODO Create video entry
+
+	filename := fmt.Sprintf("new-file-name.%s", fileExtension)
+	h.service.SaveFileToRawStorage(c, file, filename)
+
+	// TODO Trancode using FFMPEG
+
+	c.JSON(http.StatusOK, gin.H{"message": "file uploaded"})
+}
+
+func validateFileAndGetFileExtension(file *multipart.FileHeader) (string, error) {
 	filenameParts := strings.Split(file.Filename, ".")
 	if len(filenameParts) < 1 {
-		json.WriteError(c, http.StatusBadRequest, "unable to find file extension")
-		return
+		return "", fmt.Errorf("unable to find file extension")
 	}
 
 	fileExtension := filenameParts[len(filenameParts)-1]
 	invalidFileType := fileExtension != "webm" && fileExtension != "mp4"
 	if invalidFileType {
-		json.WriteError(c, http.StatusBadRequest, "supported file formats are webm or mp4")
-		return
+		return "", fmt.Errorf("supported file formats are webm or mp4")
 	}
 
-	// TODO Trancode using FFMPEG
-
-	// TODO Save to COS
-
-	dst := filepath.Join("./files/", filepath.Base("new-file-name."), fileExtension)
-	err = c.SaveUploadedFile(file, dst)
-	if err != nil {
-		json.WriteError(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "file uploaded"})
+	return fileExtension, nil
 }
 
 func (h *Handler) StreamVideo(c *gin.Context) {
