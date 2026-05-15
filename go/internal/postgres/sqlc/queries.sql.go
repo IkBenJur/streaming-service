@@ -11,18 +11,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createVideo = `-- name: CreateVideo :exec
-INSERT INTO videos (status, file_path) VALUES ($1, $2)
+const createVideo = `-- name: CreateVideo :one
+INSERT INTO videos (status, file_extension) VALUES ($1, $2) RETURNING id
 `
 
 type CreateVideoParams struct {
-	Status   pgtype.UUID `json:"status"`
-	FilePath pgtype.Text `json:"file_path"`
+	Status        pgtype.UUID `json:"status"`
+	FileExtension string      `json:"file_extension"`
 }
 
-func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) error {
-	_, err := q.db.Exec(ctx, createVideo, arg.Status, arg.FilePath)
-	return err
+func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, createVideo, arg.Status, arg.FileExtension)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const findStatusIdByName = `-- name: FindStatusIdByName :one
@@ -37,7 +39,7 @@ func (q *Queries) FindStatusIdByName(ctx context.Context, status string) (pgtype
 }
 
 const findVideoById = `-- name: FindVideoById :one
-SELECT id, status, progress, file_path, created_at, updated_at FROM videos WHERE id = $1
+SELECT id, status, progress, created_at, updated_at, file_extension FROM videos WHERE id = $1
 `
 
 func (q *Queries) FindVideoById(ctx context.Context, id pgtype.UUID) (Video, error) {
@@ -47,15 +49,15 @@ func (q *Queries) FindVideoById(ctx context.Context, id pgtype.UUID) (Video, err
 		&i.ID,
 		&i.Status,
 		&i.Progress,
-		&i.FilePath,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.FileExtension,
 	)
 	return i, err
 }
 
 const listVideos = `-- name: ListVideos :many
-SELECT id, status, progress, file_path, created_at, updated_at FROM videos
+SELECT id, status, progress, created_at, updated_at, file_extension FROM videos
 `
 
 func (q *Queries) ListVideos(ctx context.Context) ([]Video, error) {
@@ -71,9 +73,9 @@ func (q *Queries) ListVideos(ctx context.Context) ([]Video, error) {
 			&i.ID,
 			&i.Status,
 			&i.Progress,
-			&i.FilePath,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FileExtension,
 		); err != nil {
 			return nil, err
 		}

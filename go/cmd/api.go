@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"net/http"
 
+	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	"github.com/gin-gonic/gin"
 )
 
 type Application struct {
-	Port string
-	// db pgx
+	Port    string
+	Queries repo.Querier
 }
 
 func (app *Application) Mount() http.Handler {
@@ -32,7 +33,7 @@ func (app *Application) Mount() http.Handler {
 
 	router.MaxMultipartMemory = 8 << 20
 
-	videoProcessingHandler := videoProcessing.NewHandler(videoProcessing.NewLocalStorage("./files"))
+	videoProcessingHandler := videoProcessing.NewHandler(videoProcessing.NewLocalStorage("./files", app.Queries))
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 	router.GET("/stream-video/:fileName", videoProcessingHandler.StreamVideo)
 

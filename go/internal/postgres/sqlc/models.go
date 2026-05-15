@@ -9,12 +9,12 @@ import (
 )
 
 type Video struct {
-	ID        pgtype.UUID      `json:"id"`
-	Status    pgtype.UUID      `json:"status"`
-	Progress  pgtype.Int4      `json:"progress"`
-	FilePath  pgtype.Text      `json:"file_path"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	ID            pgtype.UUID      `json:"id"`
+	Status        pgtype.UUID      `json:"status"`
+	Progress      pgtype.Int4      `json:"progress"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
+	UpdatedAt     pgtype.Timestamp `json:"updated_at"`
+	FileExtension string           `json:"file_extension"`
 }
 
 type VideoStatus struct {

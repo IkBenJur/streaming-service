@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 
+	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -28,8 +29,16 @@ func run(ctx context.Context) error {
 
 	slog.Info("Connected to DB")
 
+	queries := repo.New(conn)
+
+	if err := repo.LoadVideoStatuses(ctx, queries); err != nil {
+		slog.Error("Failed to load video statuses", "error", err)
+		return err
+	}
+
 	api := Application{
-		Port: "8080",
+		Port:    "8080",
+		Queries: queries,
 	}
 
 	slog.Info("Starting server")

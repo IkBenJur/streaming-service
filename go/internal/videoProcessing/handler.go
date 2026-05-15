@@ -2,6 +2,7 @@ package videoProcessing
 
 import (
 	"fmt"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/IkBenJur/streaming-service/internal/json"
+	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/gin-gonic/gin"
 )
 
@@ -34,9 +36,17 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		json.WriteError(c, http.StatusBadRequest, err.Error())
 	}
 
-	// TODO Create video entry
+	id, err := h.service.CreateVideo(c.Request.Context(), repo.CreateVideoParams{
+		Status:        repo.VideoStatuses.Pending,
+		FileExtension: fileExtension,
+	})
+	if err != nil {
+		slog.Log(c, slog.LevelError, err.Error())
+		json.WriteError(c, http.StatusInternalServerError, "failed to create video entry")
+		return
+	}
 
-	filename := fmt.Sprintf("new-file-name.%s", fileExtension)
+	filename := fmt.Sprintf("%x.%s", id.Bytes, fileExtension)
 	h.service.SaveFileToRawStorage(c, file, filename)
 
 	// TODO Trancode using FFMPEG

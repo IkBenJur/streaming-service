@@ -5,20 +5,24 @@ import (
 	"os"
 	"path/filepath"
 
+	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/gin-gonic/gin"
 )
 
 type VideoProcessingService interface {
+	repo.Querier
 	SaveFileToRawStorage(c *gin.Context, file *multipart.FileHeader, filename string) error
 	GetChunk(name string, start, end int64) ([]byte, error)
 }
 
 type LocalStorage struct {
+	repo.Querier
 	basePath string
 }
 
-func NewLocalStorage(basePath string) *LocalStorage {
+func NewLocalStorage(basePath string, queries repo.Querier) *LocalStorage {
 	return &LocalStorage{
+		Querier:  queries,
 		basePath: basePath,
 	}
 }
