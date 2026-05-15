@@ -11,6 +11,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createVideo = `-- name: CreateVideo :exec
+INSERT INTO videos (status, file_path) VALUES ($1, $2)
+`
+
+type CreateVideoParams struct {
+	Status   pgtype.UUID `json:"status"`
+	FilePath pgtype.Text `json:"file_path"`
+}
+
+func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) error {
+	_, err := q.db.Exec(ctx, createVideo, arg.Status, arg.FilePath)
+	return err
+}
+
+const findStatusIdByName = `-- name: FindStatusIdByName :one
+SELECT id FROM video_statuses WHERE status = $1 LIMIT 1
+`
+
+func (q *Queries) FindStatusIdByName(ctx context.Context, status string) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, findStatusIdByName, status)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const findVideoById = `-- name: FindVideoById :one
 SELECT id, status, progress, file_path, created_at, updated_at FROM videos WHERE id = $1
 `
