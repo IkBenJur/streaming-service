@@ -36,7 +36,7 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		c := context.Background()
 
 		logger := slog.With("video_id", id)
-		logger.Info("transcode start")
+		logger.Info("transcode job start")
 
 		// Update status to processing
 		t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
@@ -50,21 +50,28 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 			return
 		}
 
+		logger.Info("transcode start")
 		if err = t.transcodeVideo(c, video); err != nil {
 			logger.Error(err.Error())
-			t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
+			err = t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
+			if err != nil {
+				logger.Error(fmt.Sprintf("failed to update video status %s", err.Error()))
+			}
 			return
 		}
+		logger.Info("transcode finished")
 
-		t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
+		if err = t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Finished,
-		})
+		}); err != nil {
+			logger.Error(fmt.Sprintf("failed to update video status %s", err.Error()))
+		}
 
-		logger.Info("transcode finished")
+		logger.Info("transcode job end")
 	}()
 }
 
@@ -118,11 +125,14 @@ scanLoop:
 		case "out_time_ms":
 			ms, _ := strconv.ParseInt(value, 10, 64)
 			progress := ms * 100 / int64(durationInUs)
-			t.service.UpdateVideoProgress(c,
+			err = t.service.UpdateVideoProgress(c,
 				repo.UpdateVideoProgressParams{
 					ID:       video.ID,
 					Progress: pgtype.Int4{Int32: int32(progress), Valid: true},
 				})
+			if err != nil {
+				return fmt.Errorf("transcode failed at video progess update %s", err.Error())
+			}
 		case "progress":
 			if value == "end" {
 				break scanLoop
