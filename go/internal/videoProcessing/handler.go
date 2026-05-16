@@ -2,6 +2,7 @@ package videoProcessing
 
 import (
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -31,15 +32,16 @@ func NewHandler(service VideoProcessingService, transcoder Transcoder) *Handler 
 }
 
 func (h *Handler) UploadVideo(c *gin.Context) {
-	file, err := c.FormFile("file")
+	fileFormPart, err := getFilePartFromRequest(c.Request)
 	if err != nil {
 		json.WriteError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	fileExtension, err := validateFileAndGetFileExtension(file)
+	fileExtension, err := validateFileAndGetFileExtension(fileFormPart)
 	if err != nil {
 		json.WriteError(c, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	id, err := h.service.CreateVideo(c.Request.Context(), repo.CreateVideoParams{
@@ -52,15 +54,36 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 	}
 
 	filename := fmt.Sprintf("%x.%s", id.Bytes, fileExtension)
-	h.service.SaveFileToRawStorage(c, file, filename)
+	h.service.SaveFileToRawStorage(fileFormPart, filename)
 
 	h.transcoder.Submit(id)
 
 	c.JSON(http.StatusOK, gin.H{"message": "file uploaded"})
 }
 
-func validateFileAndGetFileExtension(file *multipart.FileHeader) (string, error) {
-	filenameParts := strings.Split(file.Filename, ".")
+func getFilePartFromRequest(r *http.Request) (*multipart.Part, error) {
+	mr, err := r.MultipartReader()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			return nil, fmt.Errorf("unable to find file formpart")
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		if part.FormName() == "file" {
+			return part, nil
+		}
+	}
+}
+
+func validateFileAndGetFileExtension(part *multipart.Part) (string, error) {
+	filenameParts := strings.Split(part.FileName(), ".")
 	if len(filenameParts) < 1 {
 		return "", fmt.Errorf("unable to find file extension")
 	}

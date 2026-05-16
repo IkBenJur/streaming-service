@@ -1,17 +1,16 @@
 package videoProcessing
 
 import (
-	"mime/multipart"
+	"io"
 	"os"
 	"path/filepath"
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
-	"github.com/gin-gonic/gin"
 )
 
 type VideoProcessingService interface {
 	repo.Querier
-	SaveFileToRawStorage(c *gin.Context, file *multipart.FileHeader, filename string) error
+	SaveFileToRawStorage(r io.Reader, filename string) error
 	GetChunk(name string, start, end int64) ([]byte, error)
 }
 
@@ -27,9 +26,15 @@ func NewLocalStorage(basePath string, queries repo.Querier) *LocalStorage {
 	}
 }
 
-func (s *LocalStorage) SaveFileToRawStorage(c *gin.Context, file *multipart.FileHeader, filename string) error {
+func (s *LocalStorage) SaveFileToRawStorage(r io.Reader, filename string) error {
 	dst := filepath.Join(s.basePath, "raw", filename)
-	err := c.SaveUploadedFile(file, dst)
+	f, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, r)
 	return err
 }
 
