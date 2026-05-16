@@ -9,7 +9,9 @@ import (
 	"os/signal"
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
-	"github.com/jackc/pgx/v5"
+	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
+	videotranscoder "github.com/IkBenJur/streaming-service/internal/videoTranscoder"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func run(ctx context.Context) error {
@@ -20,12 +22,12 @@ func run(ctx context.Context) error {
 	slog.SetDefault(logger)
 
 	// TODO Use env varaibles
-	conn, err := pgx.Connect(ctx, "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable")
+	conn, err := pgxpool.New(ctx, "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable")
 	if err != nil {
 		slog.Error("Failed DB connections", "error", err)
 		return err
 	}
-	defer conn.Close(ctx)
+	defer conn.Close()
 
 	slog.Info("Connected to DB")
 
@@ -36,9 +38,15 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	transcoder := videotranscoder.NewTranscoder(
+		videoProcessing.NewLocalStorage("./files", queries),
+		2,
+	)
+
 	api := Application{
-		Port:    "8080",
-		Queries: queries,
+		Port:       "8080",
+		Queries:    queries,
+		Transcoder: transcoder,
 	}
 
 	slog.Info("Starting server")

@@ -2,7 +2,6 @@ package videoProcessing
 
 import (
 	"fmt"
-	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -12,15 +11,22 @@ import (
 	"github.com/IkBenJur/streaming-service/internal/json"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Handler struct {
-	service VideoProcessingService
+type Transcoder interface {
+	Submit(id pgtype.UUID)
 }
 
-func NewHandler(service VideoProcessingService) *Handler {
+type Handler struct {
+	service    VideoProcessingService
+	transcoder Transcoder
+}
+
+func NewHandler(service VideoProcessingService, transcoder Transcoder) *Handler {
 	return &Handler{
-		service: service,
+		service:    service,
+		transcoder: transcoder,
 	}
 }
 
@@ -41,7 +47,6 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		FileExtension: fileExtension,
 	})
 	if err != nil {
-		slog.Log(c, slog.LevelError, err.Error())
 		json.WriteError(c, http.StatusInternalServerError, "failed to create video entry")
 		return
 	}
@@ -49,7 +54,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 	filename := fmt.Sprintf("%x.%s", id.Bytes, fileExtension)
 	h.service.SaveFileToRawStorage(c, file, filename)
 
-	// TODO Trancode using FFMPEG
+	h.transcoder.Submit(id)
 
 	c.JSON(http.StatusOK, gin.H{"message": "file uploaded"})
 }

@@ -11,8 +11,9 @@ import (
 )
 
 type Application struct {
-	Port    string
-	Queries repo.Querier
+	Port       string
+	Queries    repo.Querier
+	Transcoder videoProcessing.Transcoder
 }
 
 func (app *Application) Mount() http.Handler {
@@ -33,7 +34,10 @@ func (app *Application) Mount() http.Handler {
 
 	router.MaxMultipartMemory = 8 << 20
 
-	videoProcessingHandler := videoProcessing.NewHandler(videoProcessing.NewLocalStorage("./files", app.Queries))
+	videoProcessingHandler := videoProcessing.NewHandler(
+		videoProcessing.NewLocalStorage("./files", app.Queries),
+		app.Transcoder,
+	)
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 	router.GET("/stream-video/:fileName", videoProcessingHandler.StreamVideo)
 

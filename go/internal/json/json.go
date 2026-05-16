@@ -1,8 +1,13 @@
 package json
 
-import "github.com/gin-gonic/gin"
+import (
+	"log/slog"
+
+	"github.com/gin-gonic/gin"
+)
 
 func WriteError(c *gin.Context, status int, error string) {
+	slog.Error(error)
 	c.JSON(status, gin.H{"error": error})
 }
 

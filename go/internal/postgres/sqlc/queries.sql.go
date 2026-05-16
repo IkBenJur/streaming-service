@@ -86,3 +86,17 @@ func (q *Queries) ListVideos(ctx context.Context) ([]Video, error) {
 	}
 	return items, nil
 }
+
+const updateVideoStatus = `-- name: UpdateVideoStatus :exec
+UPDATE videos SET status = $2 WHERE id = $1
+`
+
+type UpdateVideoStatusParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Status pgtype.UUID `json:"status"`
+}
+
+func (q *Queries) UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error {
+	_, err := q.db.Exec(ctx, updateVideoStatus, arg.ID, arg.Status)
+	return err
+}
