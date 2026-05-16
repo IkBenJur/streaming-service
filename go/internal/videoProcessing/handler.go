@@ -5,8 +5,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/IkBenJur/streaming-service/internal/json"
@@ -98,35 +96,4 @@ func validateFileAndGetFileExtension(part *multipart.Part) (string, error) {
 	}
 
 	return fileExtension, nil
-}
-
-func (h *Handler) StreamVideo(c *gin.Context) {
-	fileName := c.Param("fileName")
-
-	// Sanatize name
-	fileName = filepath.Base(fileName)
-
-	start, err := strconv.ParseInt(c.Query("start"), 10, 64)
-	if err != nil {
-		json.WriteError(c, http.StatusBadRequest, "invalid start")
-		return
-	}
-
-	end, err := strconv.ParseInt(c.Query("end"), 10, 64)
-	if err != nil {
-		json.WriteError(c, http.StatusBadRequest, "invalid end")
-		return
-	}
-
-	bytes, err := h.service.GetChunk(fileName, start, end)
-	if err != nil {
-		json.WriteError(c, http.StatusInternalServerError, "failed to get file")
-		return
-	}
-
-	c.Header("Content-Type", "video/webm")
-	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d", start, end))
-	c.Status(http.StatusPartialContent)
-	c.Writer.Write(bytes)
-
 }

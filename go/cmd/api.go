@@ -39,7 +39,6 @@ func (app *Application) Mount() http.Handler {
 		app.Transcoder,
 	)
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
-	router.GET("/stream-video/:fileName", videoProcessingHandler.StreamVideo)
 
 	return router
 }
