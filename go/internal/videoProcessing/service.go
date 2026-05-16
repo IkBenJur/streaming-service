@@ -12,6 +12,8 @@ type VideoProcessingService interface {
 	repo.Querier
 	SaveFileToRawStorage(r io.Reader, filename string) error
 	GetChunk(name string, start, end int64) ([]byte, error)
+	RawFilePath(filename string) string
+	HLSOutputPath(id string) (string, error)
 }
 
 type LocalStorage struct {
@@ -36,6 +38,18 @@ func (s *LocalStorage) SaveFileToRawStorage(r io.Reader, filename string) error 
 
 	_, err = io.Copy(f, r)
 	return err
+}
+
+func (s *LocalStorage) RawFilePath(filename string) string {
+	return filepath.Join(s.basePath, "raw", filename)
+}
+
+func (s *LocalStorage) HLSOutputPath(id string) (string, error) {
+	path := filepath.Join(s.basePath, "hls", id)
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func (s *LocalStorage) GetChunk(name string, start, end int64) ([]byte, error) {
