@@ -54,7 +54,10 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 	}
 
 	filename := fmt.Sprintf("%x.%s", id.Bytes, fileExtension)
-	h.service.SaveFileToRawStorage(fileFormPart, filename)
+	if err = h.service.SaveFileToRawStorage(fileFormPart, filename); err != nil {
+		json.WriteError(c, http.StatusInternalServerError, "failed to save video")
+		return
+	}
 
 	h.transcoder.Submit(id)
 
