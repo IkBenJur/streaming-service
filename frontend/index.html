@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streaming Service</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #fff;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      width: 100%;
+      max-width: 720px;
+    }
+
+    input {
+      flex: 1;
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-size: 0.9rem;
+      font-family: monospace;
+    }
+
+    input::placeholder { color: #555; }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      border: none;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button:hover { background: #2563eb; }
+
+    video {
+      width: 100%;
+      max-width: 720px;
+      border-radius: 8px;
+      background: #000;
+    }
+
+    #status {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: #888;
+      max-width: 720px;
+      width: 100%;
+    }
+
+    #status.error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>Streaming Service</h1>
+
+  <div class="controls">
+    <input id="videoId" type="text" placeholder="Video UUID (e.g. 0f8548e4-5631-49b6-9cdb-7d2ac5b94f8e)" />
+    <button onclick="loadVideo()">Play</button>
+  </div>
+
+  <video id="player" controls></video>
+  <p id="status"></p>
+
+  <script>
+    let hls = null;
+
+    function loadVideo() {
+      const id = document.getElementById('videoId').value.trim();
+      const status = document.getElementById('status');
+      const video = document.getElementById('player');
+
+      if (!id) {
+        setStatus('Enter a video UUID.', true);
+        return;
+      }
+
+      const src = `http://localhost:8080/video-stream/${id}/playlist.m3u8`;
+      setStatus(`Loading ${src} …`);
+
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setStatus('');
+          video.play();
+        });
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) setStatus(`Error: ${data.details}`, true);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = src;
+        video.addEventListener('loadedmetadata', () => { setStatus(''); video.play(); }, { once: true });
+        video.addEventListener('error', () => setStatus('Playback error.', true), { once: true });
+      } else {
+        setStatus('HLS is not supported in this browser.', true);
+      }
+    }
+
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = isError ? 'error' : '';
+    }
+
+    document.getElementById('videoId').addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadVideo();
+    });
+  </script>
+</body>
+</html>
