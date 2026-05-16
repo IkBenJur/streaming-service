@@ -12,3 +12,6 @@ SELECT id FROM video_statuses WHERE status = $1 LIMIT 1;
 
 -- name: UpdateVideoStatus :exec
 UPDATE videos SET status = $2 WHERE id = $1;
+
+-- name: UpdateVideoProgress :exec
+UPDATE videos SET progress = $2 WHERE id = $1;

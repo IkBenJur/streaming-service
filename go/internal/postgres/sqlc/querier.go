@@ -15,6 +15,7 @@ type Querier interface {
 	FindStatusIdByName(ctx context.Context, status string) (pgtype.UUID, error)
 	FindVideoById(ctx context.Context, id pgtype.UUID) (Video, error)
 	ListVideos(ctx context.Context) ([]Video, error)
+	UpdateVideoProgress(ctx context.Context, arg UpdateVideoProgressParams) error
 	UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error
 }
 
