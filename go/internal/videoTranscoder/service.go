@@ -150,7 +150,7 @@ func determineTranscodeDurationInUs(c context.Context, inputPath string) (int, e
 		"ffprobe",
 		"-v", "quiet",
 		"-print_format", "json",
-		"-show_entries", "stream=codec_type,duration",
+		"-show_entries", "stream=codec_type,duration:format=duration",
 		inputPath,
 	)
 
@@ -164,6 +164,9 @@ func determineTranscodeDurationInUs(c context.Context, inputPath string) (int, e
 			Codec_type string `json:"codec_type"`
 			Duration   string `json:"duration"`
 		} `json:"streams"`
+		Format struct {
+			Duration string `json:"duration"`
+		} `json:"format"`
 	}
 
 	if err = json.Unmarshal(out, &result); err != nil {
@@ -175,13 +178,23 @@ func determineTranscodeDurationInUs(c context.Context, inputPath string) (int, e
 			continue
 		}
 
-		seconds, err := strconv.ParseFloat(s.Duration, 64)
+		if s.Duration != "" {
+			seconds, err := strconv.ParseFloat(s.Duration, 64)
+			if err != nil {
+				return 0, err
+			}
+			return int(seconds * 1000 * 1000), nil
+		}
+		break
+	}
+
+	if result.Format.Duration != "" {
+		seconds, err := strconv.ParseFloat(result.Format.Duration, 64)
 		if err != nil {
 			return 0, err
 		}
-
 		return int(seconds * 1000 * 1000), nil
 	}
 
-	return 0, fmt.Errorf("was not able to find video codec type")
+	return 0, fmt.Errorf("was not able to find video duration")
 }
