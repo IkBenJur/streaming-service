@@ -85,7 +85,7 @@ func getFilePartFromRequest(r *http.Request) (*multipart.Part, error) {
 
 func validateFileAndGetFileExtension(part *multipart.Part) (string, error) {
 	filenameParts := strings.Split(part.FileName(), ".")
-	if len(filenameParts) < 1 {
+	if len(filenameParts) < 2 {
 		return "", fmt.Errorf("unable to find file extension")
 	}
 
