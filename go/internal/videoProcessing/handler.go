@@ -1,6 +1,7 @@
 package videoProcessing
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,7 +15,7 @@ import (
 )
 
 type Transcoder interface {
-	Submit(id pgtype.UUID)
+	Submit(c context.Context, id pgtype.UUID)
 }
 
 type Handler struct {
@@ -57,7 +58,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	h.transcoder.Submit(id)
+	h.transcoder.Submit(c, id)
 
 	c.JSON(http.StatusOK, gin.H{"message": "file uploaded"})
 }

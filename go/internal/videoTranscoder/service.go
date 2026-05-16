@@ -28,12 +28,10 @@ func NewTranscoder(service videoProcessing.VideoProcessingService, maxNrOfWorker
 	}
 }
 
-func (t *VideoTranscoder) Submit(id pgtype.UUID) {
+func (t *VideoTranscoder) Submit(c context.Context, id pgtype.UUID) {
 	go func() {
 		t.semaphore <- struct{}{}
 		defer func() { <-t.semaphore }()
-
-		c := context.Background()
 
 		logger := slog.With("video_id", id)
 		logger.Info("transcode job start")
@@ -185,5 +183,5 @@ func determineTranscodeDurationInUs(c context.Context, inputPath string) (int, e
 		return int(seconds * 1000 * 1000), nil
 	}
 
-	return 0, nil
+	return 0, fmt.Errorf("was not able to find video codec type")
 }

@@ -23,7 +23,7 @@ type videoStatusIDs struct {
 
 var VideoStatuses videoStatusIDs
 
-func LoadVideoStatuses(ctx context.Context, q *Queries) error {
+func LoadVideoStatuses(ctx context.Context, q Querier) error {
 	pending, err := q.FindStatusIdByName(ctx, videoStatusPending)
 	if err != nil {
 		return fmt.Errorf("load pending status: %w", err)
