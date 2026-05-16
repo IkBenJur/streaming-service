@@ -19,10 +19,14 @@ type Application struct {
 func (app *Application) Mount() http.Handler {
 	router := gin.Default()
 
-	// Ignore CORS for now
-	// TODO SETUP CORS
 	router.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type")
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
 		c.Next()
 	})
 
@@ -39,6 +43,7 @@ func (app *Application) Mount() http.Handler {
 		app.Transcoder,
 	)
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
+	router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
 
 	return router
 }

@@ -1,7 +1,9 @@
 package videoProcessing
 
 import (
+	"context"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -11,7 +13,7 @@ import (
 type VideoProcessingService interface {
 	repo.Querier
 	SaveFileToRawStorage(r io.Reader, filename string) error
-	GetChunk(name string, start, end int64) ([]byte, error)
+	GetFile(ctx context.Context, key string) (io.ReadCloser, error)
 	RawFilePath(filename string) string
 	HLSOutputPath(id string) (string, error)
 }
@@ -52,14 +54,7 @@ func (s *LocalStorage) HLSOutputPath(id string) (string, error) {
 	return path, nil
 }
 
-func (s *LocalStorage) GetChunk(name string, start, end int64) ([]byte, error) {
-	file, err := os.Open(filepath.Join(s.basePath, filepath.Base(name)))
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	buf := make([]byte, end-start+1)
-	_, err = file.ReadAt(buf, start)
-	return buf, err
+func (s *LocalStorage) GetFile(ctx context.Context, key string) (io.ReadCloser, error) {
+	slog.Info(filepath.Join(s.basePath, key))
+	return os.Open(filepath.Join(s.basePath, key))
 }
