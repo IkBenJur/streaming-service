@@ -24,6 +24,8 @@ type LocalStorage struct {
 }
 
 func NewLocalStorage(basePath string, queries repo.Querier) *LocalStorage {
+	os.MkdirAll(filepath.Join(basePath, "raw"), 0755)
+	os.MkdirAll(filepath.Join(basePath, "hls"), 0755)
 	return &LocalStorage{
 		Querier:  queries,
 		basePath: basePath,

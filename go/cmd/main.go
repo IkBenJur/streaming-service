@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"github.com/IkBenJur/streaming-service/internal/env"
+	"github.com/IkBenJur/streaming-service/internal/postgres"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	videotranscoder "github.com/IkBenJur/streaming-service/internal/videoTranscoder"
@@ -22,7 +23,14 @@ func run(ctx context.Context) error {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	conn, err := pgxpool.New(ctx, env.GetEnv("GOOSE_DBSTRING", "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable"))
+	dsn := env.GetEnv("GOOSE_DBSTRING", "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable")
+
+	if err := postgres.RunMigrations(ctx, dsn); err != nil {
+		slog.Error("Failed to run migrations", "error", err)
+		return err
+	}
+
+	conn, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		slog.Error("Failed DB connections", "error", err)
 		return err
@@ -44,7 +52,7 @@ func run(ctx context.Context) error {
 	)
 
 	api := Application{
-		Port:       "8080",
+		Port:       env.GetEnv("PORT", "8080"),
 		Queries:    queries,
 		Transcoder: transcoder,
 	}
