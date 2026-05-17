@@ -1,9 +1,11 @@
 package videoProcessing
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +20,7 @@ import (
 type mockService struct {
 	repo.Querier
 	findVideoById        func(ctx context.Context, id pgtype.UUID) (repo.Video, error)
+	createVideo          func(ctx context.Context, arg repo.CreateVideoParams) (pgtype.UUID, error)
 	saveFileToRawStorage func(r io.Reader, filename string) error
 	getFile              func(ctx context.Context, key string) (io.ReadCloser, error)
 	rawFilePath          func(filename string) string
@@ -26,6 +29,10 @@ type mockService struct {
 
 func (m *mockService) FindVideoById(ctx context.Context, id pgtype.UUID) (repo.Video, error) {
 	return m.findVideoById(ctx, id)
+}
+
+func (m *mockService) CreateVideo(ctx context.Context, arg repo.CreateVideoParams) (pgtype.UUID, error) {
+	return m.createVideo(ctx, arg)
 }
 
 func (m *mockService) SaveFileToRawStorage(r io.Reader, filename string) error {
@@ -50,6 +57,64 @@ type mockTranscoder struct {
 
 func (m *mockTranscoder) Submit(c context.Context, id pgtype.UUID) {
 	m.submitted = append(m.submitted, id)
+}
+
+func TestUploadVideo_ValidateFileExtension(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewHandler(&mockService{}, &mockTranscoder{})
+
+	w := httptest.NewRecorder()
+	c, r := gin.CreateTestContext(w)
+	r.POST("/videos/upload", h.UploadVideo)
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, _ := mw.CreateFormFile("file", "test.txt")
+	part.Write([]byte("fake video bytes"))
+	mw.Close()
+
+	c.Request, _ = http.NewRequest("POST", "/videos/upload", &body)
+	c.Request.Header.Set("Content-Type", mw.FormDataContentType())
+
+	r.ServeHTTP(w, c.Request)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("got %d; want 400", w.Code)
+	}
+}
+
+func TestUploadVideo_StatusOk(t *testing.T) {
+
+	id := uuid.New()
+	videoId := pgtype.UUID{Bytes: [16]byte(id), Valid: true}
+	gin.SetMode(gin.TestMode)
+	h := NewHandler(&mockService{
+		createVideo: func(ctx context.Context, arg repo.CreateVideoParams) (pgtype.UUID, error) {
+			return videoId, nil
+		},
+		saveFileToRawStorage: func(r io.Reader, filename string) error {
+			return nil
+		},
+	}, &mockTranscoder{})
+
+	w := httptest.NewRecorder()
+	c, r := gin.CreateTestContext(w)
+	r.POST("/videos/upload", h.UploadVideo)
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, _ := mw.CreateFormFile("file", "test.mp4")
+	part.Write([]byte("fake video bytes"))
+	mw.Close()
+
+	c.Request, _ = http.NewRequest("POST", "/videos/upload", &body)
+	c.Request.Header.Set("Content-Type", mw.FormDataContentType())
+
+	r.ServeHTTP(w, c.Request)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("got %d; want 201", w.Code)
+	}
 }
 
 func TestGetVideoStream_InvalidID(t *testing.T) {
