@@ -1,0 +1,9 @@
+FROM nginx:alpine
+
+COPY frontend/index.html /usr/share/nginx/html/index.html.template
+COPY build/entrypoint.frontend.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/entrypoint.sh"]

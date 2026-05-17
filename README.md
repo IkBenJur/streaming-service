@@ -65,10 +65,12 @@ The server starts on `http://localhost:8080`.
 
 All commands run from the repo root (`streaming-service/`).
 
+### Backend
+
 **Build**
 
 ```sh
-docker build -f build/Dockerfile.backend -t streaming-service .
+docker build -f build/Dockerfile.backend -t streaming-service-backend .
 ```
 
 **Run**
@@ -79,10 +81,29 @@ docker run --rm \
   --network go_default \
   -e GOOSE_DBSTRING="host=video-stream-postgres user=postgres password=postgres dbname=video-stream sslmode=disable" \
   -v $(pwd)/files:/app/files \
-  streaming-service
+  streaming-service-backend
 ```
 
-The app container must be on the same Docker network as Postgres. `go_default` is the network created by `docker compose up` when run from the `go/` directory — verify with `docker network ls` if the name differs.
+The backend container must be on the same Docker network as Postgres. `go_default` is the network created by `docker compose up` when run from the `go/` directory — verify with `docker network ls` if the name differs.
+
+### Frontend
+
+**Build**
+
+```sh
+docker build -f build/Dockerfile.frontend -t streaming-service-frontend .
+```
+
+**Run**
+
+```sh
+docker run --rm \
+  -p 80:80 \
+  -e BACKEND_URL="http://localhost:8080" \
+  streaming-service-frontend
+```
+
+Set `BACKEND_URL` to wherever the backend is reachable from the browser.
 
 ## Common Tasks
 
