@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/IkBenJur/streaming-service/internal/env"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	videotranscoder "github.com/IkBenJur/streaming-service/internal/videoTranscoder"
@@ -21,8 +22,7 @@ func run(ctx context.Context) error {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	// TODO Use env varaibles
-	conn, err := pgxpool.New(ctx, "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable")
+	conn, err := pgxpool.New(ctx, env.GetEnv("GOOSE_DBSTRING", "host=localhost user=postgres password=postgres dbname=video-stream sslmode=disable"))
 	if err != nil {
 		slog.Error("Failed DB connections", "error", err)
 		return err
@@ -40,7 +40,7 @@ func run(ctx context.Context) error {
 
 	transcoder := videotranscoder.NewTranscoder(
 		videoProcessing.NewLocalStorage("./files", queries),
-		2,
+		env.GetEnvInt("TRANCODE_JOB_NUMBER_OF_WORKERS", 2),
 	)
 
 	api := Application{
