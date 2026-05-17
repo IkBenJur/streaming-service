@@ -1,7 +1,6 @@
 package videoProcessing
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -18,7 +17,7 @@ import (
 )
 
 type Transcoder interface {
-	Submit(c context.Context, id pgtype.UUID)
+	Submit(id pgtype.UUID)
 }
 
 type Handler struct {
@@ -103,9 +102,9 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	h.transcoder.Submit(c, id)
+	h.transcoder.Submit(id)
 
-	c.JSON(http.StatusOK, gin.H{"id": id})
+	c.JSON(http.StatusCreated, gin.H{"id": id})
 }
 
 func getFilePartFromRequest(r *http.Request) (*multipart.Part, error) {

@@ -28,8 +28,9 @@ func NewTranscoder(service videoProcessing.VideoProcessingService, maxNrOfWorker
 	}
 }
 
-func (t *VideoTranscoder) Submit(c context.Context, id pgtype.UUID) {
+func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 	go func() {
+		ctx := context.Background()
 		t.semaphore <- struct{}{}
 		defer func() { <-t.semaphore }()
 
@@ -37,21 +38,21 @@ func (t *VideoTranscoder) Submit(c context.Context, id pgtype.UUID) {
 		logger.Info("transcode job start")
 
 		// Update status to processing
-		t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
+		t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Processing,
 		})
 
-		video, err := t.service.FindVideoById(c, id)
+		video, err := t.service.FindVideoById(ctx, id)
 		if err != nil {
 			logger.Error(fmt.Sprintf("transcode failed %s", err.Error()))
 			return
 		}
 
 		logger.Info("transcode start")
-		if err = t.transcodeVideo(c, video); err != nil {
+		if err = t.transcodeVideo(ctx, video); err != nil {
 			logger.Error(err.Error())
-			err = t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
+			err = t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
@@ -62,7 +63,7 @@ func (t *VideoTranscoder) Submit(c context.Context, id pgtype.UUID) {
 		}
 		logger.Info("transcode finished")
 
-		if err = t.service.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
+		if err = t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Finished,
 		}); err != nil {

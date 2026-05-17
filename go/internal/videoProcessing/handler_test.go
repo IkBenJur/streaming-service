@@ -55,7 +55,7 @@ type mockTranscoder struct {
 	submitted []pgtype.UUID
 }
 
-func (m *mockTranscoder) Submit(c context.Context, id pgtype.UUID) {
+func (m *mockTranscoder) Submit(id pgtype.UUID) {
 	m.submitted = append(m.submitted, id)
 }
 
