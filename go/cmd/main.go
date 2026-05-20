@@ -13,12 +13,17 @@ import (
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	videotranscoder "github.com/IkBenJur/streaming-service/internal/videoTranscoder"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 func run(ctx context.Context) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
+
+	godotenv.Load()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
@@ -48,13 +53,27 @@ func run(ctx context.Context) error {
 
 	transcoder := videotranscoder.NewTranscoder(
 		videoProcessing.NewLocalStorage("./files", queries),
-		env.GetEnvInt("TRANCODE_JOB_NUMBER_OF_WORKERS", 2),
+		env.GetEnvInt("TRANSCODE_JOB_NUMBER_OF_WORKERS", 2),
 	)
+
+	runLocalStorage := env.GetEnvBool("RUN_LOCAL_STORAGE", false)
+
+	var awsConfig aws.Config
+	if runLocalStorage {
+		slog.Warn("Running with local storage")
+	} else {
+		slog.Info("Running with S3")
+		awsConfig, err = config.LoadDefaultConfig(ctx)
+		if err != nil {
+			return err
+		}
+	}
 
 	api := Application{
 		Port:       env.GetEnv("PORT", "8080"),
 		Queries:    queries,
 		Transcoder: transcoder,
+		AwsConfig:  awsConfig,
 	}
 
 	slog.Info("Starting server")

@@ -23,3 +23,13 @@ func GetEnvInt(key string, defaultValue int) int {
 	slog.Warn("Env variable not found, resolving to default", "key", key, "default", defaultValue)
 	return defaultValue
 }
+
+func GetEnvBool(key string, defaultValue bool) bool {
+	if value, ok := os.LookupEnv(key); ok {
+		if parsed, err := strconv.ParseBool(value); err == nil {
+			return parsed
+		}
+	}
+	slog.Warn("Env variable not found, resolving to default", "key", key, "default", defaultValue)
+	return defaultValue
+}
