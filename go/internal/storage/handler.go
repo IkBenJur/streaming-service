@@ -8,6 +8,8 @@ import (
 	"github.com/IkBenJur/streaming-service/internal/json"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
@@ -75,4 +77,41 @@ func (h *Handler) CreateVideoAndGetUploadUrl(c *gin.Context) {
 		"id":         id,
 		"upload-url": presignedUrl,
 	})
+}
+
+type SubmitVideoProcessJobRequest struct {
+	ID string `json:"id" binding:"required"`
+}
+
+func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
+	var req SubmitVideoProcessJobRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		json.WriteError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	parsed, err := uuid.Parse(req.ID)
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusBadRequest, "invalid id format")
+		return
+	}
+	id := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	valid, err := h.Querier.VideoHasValidStatusToStartProcessingJob(c.Request.Context(), id)
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to validate video status")
+		return
+	}
+	if !valid {
+		json.WriteErrorFromString(c, http.StatusConflict, "video is not in a valid state to start processing")
+		return
+	}
+
+	// TODO Validate files exists in COS
+
+	// TODO Get files from COS to local disk
+
+	// TODO Submit transcode job
+
+	json.WriteSucces(c, http.StatusOK, "processing job submitted")
 }

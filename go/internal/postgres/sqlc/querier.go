@@ -17,6 +17,7 @@ type Querier interface {
 	ListVideos(ctx context.Context) ([]Video, error)
 	UpdateVideoProgress(ctx context.Context, arg UpdateVideoProgressParams) error
 	UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error
+	VideoHasValidStatusToStartProcessingJob(ctx context.Context, id pgtype.UUID) (bool, error)
 }
 
 var _ Querier = (*Queries)(nil)

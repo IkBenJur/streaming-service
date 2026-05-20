@@ -114,3 +114,17 @@ func (q *Queries) UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusPa
 	_, err := q.db.Exec(ctx, updateVideoStatus, arg.ID, arg.Status)
 	return err
 }
+
+const videoHasValidStatusToStartProcessingJob = `-- name: VideoHasValidStatusToStartProcessingJob :one
+SELECT COUNT(*) > 0
+FROM videos video
+JOIN video_statuses vstatus ON vstatus.id = video.status
+WHERE video.id = $1 AND vstatus.status = 'pending'
+`
+
+func (q *Queries) VideoHasValidStatusToStartProcessingJob(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, videoHasValidStatusToStartProcessingJob, id)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
