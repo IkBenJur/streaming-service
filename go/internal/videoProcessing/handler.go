@@ -35,25 +35,25 @@ func NewHandler(service VideoProcessingService, transcoder Transcoder) *Handler 
 func (h *Handler) GetVideoStream(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		json.WriteError(c, http.StatusBadRequest, "invalid id")
+		json.WriteErrorFromString(c, http.StatusBadRequest, "invalid id")
 		return
 	}
 
 	videoId := pgtype.UUID{Bytes: [16]byte(id), Valid: true}
 	video, err := h.service.FindVideoById(c, videoId)
 	if err != nil {
-		json.WriteError(c, http.StatusNotFound, "invalid id")
+		json.WriteErrorFromString(c, http.StatusNotFound, "invalid id")
 		return
 	}
 
 	if video.Status != repo.VideoStatuses.Finished {
-		json.WriteError(c, http.StatusBadRequest, "video status not set to finished")
+		json.WriteErrorFromString(c, http.StatusBadRequest, "video status not set to finished")
 		return
 	}
 
 	file := c.Param("file")
 	if strings.ContainsAny(file, "/\\") {
-		json.WriteError(c, http.StatusBadRequest, "invalid file")
+		json.WriteErrorFromString(c, http.StatusBadRequest, "invalid file")
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *Handler) GetVideoStream(c *gin.Context) {
 	slog.Info(key)
 	rc, err := h.service.GetFile(c.Request.Context(), key)
 	if err != nil {
-		json.WriteError(c, http.StatusNotFound, "file not found")
+		json.WriteErrorFromString(c, http.StatusNotFound, "file not found")
 		return
 	}
 	defer rc.Close()
@@ -77,13 +77,13 @@ func (h *Handler) GetVideoStream(c *gin.Context) {
 func (h *Handler) UploadVideo(c *gin.Context) {
 	fileFormPart, err := getFilePartFromRequest(c.Request)
 	if err != nil {
-		json.WriteError(c, http.StatusBadRequest, err.Error())
+		json.WriteErrorFromString(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	fileExtension, err := validateFileAndGetFileExtension(fileFormPart)
 	if err != nil {
-		json.WriteError(c, http.StatusBadRequest, err.Error())
+		json.WriteErrorFromString(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -92,13 +92,13 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		FileExtension: fileExtension,
 	})
 	if err != nil {
-		json.WriteError(c, http.StatusInternalServerError, "failed to create video entry")
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to create video entry")
 		return
 	}
 
 	filename := fmt.Sprintf("%x.%s", id.Bytes, fileExtension)
 	if err = h.service.SaveFileToRawStorage(fileFormPart, filename); err != nil {
-		json.WriteError(c, http.StatusInternalServerError, "failed to save video")
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to save video")
 		return
 	}
 

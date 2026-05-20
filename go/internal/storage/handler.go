@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/IkBenJur/streaming-service/internal/json"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
@@ -21,33 +22,52 @@ func NewHandler(querier repo.Querier, s3Client S3Storage) *Handler {
 	}
 }
 
-// type UploadRequest struct {
-//       Title       string `json:"title"        binding:"required"`
-//       Description string `json:"description"  binding:"required,max=500"`
-//       IsPublic    bool   `json:"is_public"`
-//   }
+type CreateVideoAndGetUploadUrlRequest struct {
+	Title    string `json:"title" binding:"required"`
+	FileName string `json:"file_name" binding:"required"`
+}
 
-//   func (h *Handler) UploadVideo(c *gin.Context) {
-//       var req UploadRequest
-//       if err := c.ShouldBindJSON(&req); err != nil {
-//           c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-//           return
-//       }
+func (req *CreateVideoAndGetUploadUrlRequest) validateFileAndGetExtension() (string, error) {
+	filenameParts := strings.Split(req.FileName, ".")
+	if len(filenameParts) < 2 {
+		return "", fmt.Errorf("unable to find file extension")
+	}
+
+	fileExtension := filenameParts[len(filenameParts)-1]
+	invalidFileType := fileExtension != "webm" && fileExtension != "mp4"
+	if invalidFileType {
+		return "", fmt.Errorf("supported file formats are webm or mp4")
+	}
+
+	return fileExtension, nil
+}
 
 func (h *Handler) CreateVideoAndGetUploadUrl(c *gin.Context) {
-	id, err := h.Querier.CreateVideo(c.Request.Context(), repo.CreateVideoParams{
-		Status:        repo.VideoStatuses.Pending,
-		FileExtension: "mp4",
-	})
-	if err != nil {
-		json.WriteError(c, http.StatusInternalServerError, "failed to create video entry")
+	var req CreateVideoAndGetUploadUrlRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		json.WriteError(c, http.StatusBadRequest, err)
 		return
 	}
 
-	key := GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, "mp4"))
+	fileExentension, err := req.validateFileAndGetExtension()
+	if err != nil {
+		json.WriteError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	id, err := h.Querier.CreateVideo(c.Request.Context(), repo.CreateVideoParams{
+		Status:        repo.VideoStatuses.Pending,
+		FileExtension: fileExentension,
+	})
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to create video entry")
+		return
+	}
+
+	key := GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, fileExentension))
 	presignedUrl, err := h.s3Client.GenerateRawUploadUrl(c, key)
 	if err != nil {
-		json.WriteError(c, http.StatusInternalServerError, "failed to create url")
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to create url")
 		return
 	}
 
