@@ -38,8 +38,14 @@ cp .env.example .env
 | `GOOSE_MIGRATION_DIR` | `./internal/postgres/migrations` | Migration directory — only needed for CLI usage |
 | `PORT` | `8080` | Port the HTTP server listens on |
 | `TRANCODE_JOB_NUMBER_OF_WORKERS` | `2` | Number of concurrent transcoding workers |
+| `RUN_LOCAL_STORAGE` | `false` | Set to `true` to skip S3 and use local file storage instead |
+| `AWS_ENDPOINT_URL` | — | S3-compatible endpoint (e.g. `https://t3.storageapi.dev` for Railway) |
+| `AWS_S3_BUCKET_NAME` | — | Name of the S3 bucket |
+| `AWS_DEFAULT_REGION` | — | Region — use `auto` for Railway/Tigris |
+| `AWS_ACCESS_KEY_ID` | — | S3 access key |
+| `AWS_SECRET_ACCESS_KEY` | — | S3 secret key |
 
-The app reads `GOOSE_DBSTRING` at startup. The other `GOOSE_*` variables are only needed when using the goose CLI directly (e.g. for rollbacks).
+The app reads `GOOSE_DBSTRING` at startup. The other `GOOSE_*` variables are only needed when using the goose CLI directly (e.g. for rollbacks). S3 variables are required when `RUN_LOCAL_STORAGE=false`.
 
 ## Dev Setup
 
@@ -121,6 +127,34 @@ sqlc generate
 
 > Do not manually edit sqlc-generated files (`db.go`, `models.go`, `querier.go`, `queries.sql.go`).
 
+## Object Storage (Railway / Tigris)
+
+Videos are stored in an S3-compatible bucket. Railway uses [Tigris](https://www.tigrisdata.com/) under the hood — credentials are available in the Railway dashboard under the bucket's **Settings** tab.
+
+Railway has no built-in UI for browsing bucket contents. Use the AWS CLI instead:
+
+```sh
+# Install (Arch)
+sudo pacman -S aws-cli-v2
+
+# List all objects
+source go/.env && aws s3 ls s3://$AWS_S3_BUCKET_NAME/ --endpoint-url $AWS_ENDPOINT_URL --recursive
+```
+
+To upload a file directly via a presigned URL (useful for testing):
+
+```sh
+./upload_file_to_url.sh "<presigned-url>"
+```
+
+Get a presigned URL from the API:
+
+```sh
+curl -s -X POST http://localhost:8080/create-video-and-get-upload-url \
+  -H "Content-Type: application/json" \
+  | jq -r '."upload-url"'
+```
+
 ## API
 
 | Method | Path | Description |
@@ -128,6 +162,7 @@ sqlc generate
 | GET | `/health` | Health check |
 | POST | `/upload-video` | Upload a video file (multipart form) |
 | GET | `/stream-video/:fileName` | Stream a transcoded video |
+| POST | `/create-video-and-get-upload-url` | Create a video entry and return a presigned S3 upload URL |
 
 ## Project Structure
 

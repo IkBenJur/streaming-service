@@ -1,10 +1,20 @@
 package env
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
 )
+
+func GetEnvOrErr(key string) (string, error) {
+	if value, ok := os.LookupEnv(key); ok {
+		return value, nil
+	}
+
+	slog.Error("Env variable not found", "key", key)
+	return "", fmt.Errorf("failed to get key")
+}
 
 func GetEnv(key, defaultValue string) string {
 	if value, ok := os.LookupEnv(key); ok {

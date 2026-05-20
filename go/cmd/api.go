@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
+	"github.com/IkBenJur/streaming-service/internal/storage"
 	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +15,7 @@ type Application struct {
 	Port       string
 	Queries    repo.Querier
 	Transcoder videoProcessing.Transcoder
-	AwsConfig  aws.Config
+	S3Client   storage.S3Storage
 }
 
 func (app *Application) Mount() http.Handler {
@@ -40,14 +40,15 @@ func (app *Application) Mount() http.Handler {
 
 	router.MaxMultipartMemory = 8 << 20
 
-	// storage.NewS3Storage(app.AwsConfig)
-
 	videoProcessingHandler := videoProcessing.NewHandler(
 		videoProcessing.NewLocalStorage("./files", app.Queries),
 		app.Transcoder,
 	)
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 	router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
+
+	storageHandler := storage.NewHandler(app.Queries, app.S3Client)
+	router.POST("/create-video-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
 
 	return router
 }

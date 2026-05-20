@@ -11,9 +11,9 @@ import (
 	"github.com/IkBenJur/streaming-service/internal/env"
 	"github.com/IkBenJur/streaming-service/internal/postgres"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
+	"github.com/IkBenJur/streaming-service/internal/storage"
 	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	videotranscoder "github.com/IkBenJur/streaming-service/internal/videoTranscoder"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -58,22 +58,32 @@ func run(ctx context.Context) error {
 
 	runLocalStorage := env.GetEnvBool("RUN_LOCAL_STORAGE", false)
 
-	var awsConfig aws.Config
+	var s3Client *storage.S3Storage
 	if runLocalStorage {
 		slog.Warn("Running with local storage")
 	} else {
 		slog.Info("Running with S3")
-		awsConfig, err = config.LoadDefaultConfig(ctx)
+		awsConfig, err := config.LoadDefaultConfig(ctx)
 		if err != nil {
 			return err
 		}
+
+		bucketName, err := env.GetEnvOrErr("AWS_S3_BUCKET_NAME")
+		slog.Info(bucketName)
+		if err != nil {
+			return err
+		}
+		s3Client = storage.NewS3Storage(
+			awsConfig,
+			bucketName,
+		)
 	}
 
 	api := Application{
 		Port:       env.GetEnv("PORT", "8080"),
 		Queries:    queries,
 		Transcoder: transcoder,
-		AwsConfig:  awsConfig,
+		S3Client:   *s3Client,
 	}
 
 	slog.Info("Starting server")
