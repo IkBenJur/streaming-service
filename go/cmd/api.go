@@ -48,7 +48,8 @@ func (app *Application) Mount() http.Handler {
 	router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
 
 	storageHandler := storage.NewHandler(app.Queries, app.S3Client)
-	router.POST("/create-video-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
+	router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
+	router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)
 
 	return router
 }

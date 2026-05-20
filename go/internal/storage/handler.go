@@ -79,18 +79,8 @@ func (h *Handler) CreateVideoAndGetUploadUrl(c *gin.Context) {
 	})
 }
 
-type SubmitVideoProcessJobRequest struct {
-	ID string `json:"id" binding:"required"`
-}
-
 func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
-	var req SubmitVideoProcessJobRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		json.WriteError(c, http.StatusBadRequest, err)
-		return
-	}
-
-	parsed, err := uuid.Parse(req.ID)
+	parsed, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		json.WriteErrorFromString(c, http.StatusBadRequest, "invalid id format")
 		return
