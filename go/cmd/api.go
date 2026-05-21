@@ -39,6 +39,7 @@ func (app *Application) Mount() http.Handler {
 		})
 	})
 
+	// TODO We only run with s3 client for now but local storage should follow same interface as s3 so it can be used with the same handlers
 	if app.LocalStorage {
 		router.MaxMultipartMemory = 8 << 20
 		localStore := storage.NewLocalStorage("./files")
