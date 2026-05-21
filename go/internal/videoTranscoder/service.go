@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -62,6 +63,11 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 			return
 		}
 		logger.Info("transcode finished")
+
+		rawPath := t.service.RawFilePath(fmt.Sprintf("%x.%s", video.ID.Bytes, video.FileExtension))
+		if err = os.Remove(rawPath); err != nil {
+			logger.Error(fmt.Sprintf("failed to remove raw file %s", err.Error()))
+		}
 
 		if err = t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 			ID:     id,
