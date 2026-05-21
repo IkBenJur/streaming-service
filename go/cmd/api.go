@@ -40,14 +40,13 @@ func (app *Application) Mount() http.Handler {
 
 	router.MaxMultipartMemory = 8 << 20
 
-	videoProcessingHandler := videoProcessing.NewHandler(
-		videoProcessing.NewLocalStorage("./files", app.Queries),
-		app.Transcoder,
-	)
+	localStorage := videoProcessing.NewLocalStorage("./files", app.Queries)
+
+	videoProcessingHandler := videoProcessing.NewHandler(localStorage, app.Transcoder)
 	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 	router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
 
-	storageHandler := storage.NewHandler(app.Queries, app.S3Client, app.Transcoder)
+	storageHandler := storage.NewHandler(app.Queries, app.S3Client, app.Transcoder, localStorage)
 	router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
 	router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)
 

@@ -16,17 +16,23 @@ type Transcoder interface {
 	Submit(id pgtype.UUID)
 }
 
-type Handler struct {
-	repo.Querier
-	s3Client   S3Storage
-	transcoder Transcoder
+type LocalFileStorage interface {
+	RawFilePath(filename string) string
 }
 
-func NewHandler(querier repo.Querier, s3Client S3Storage, transcoder Transcoder) *Handler {
+type Handler struct {
+	repo.Querier
+	s3Client     S3Storage
+	transcoder   Transcoder
+	fileStorage  LocalFileStorage
+}
+
+func NewHandler(querier repo.Querier, s3Client S3Storage, transcoder Transcoder, fileStorage LocalFileStorage) *Handler {
 	return &Handler{
-		Querier:    querier,
-		s3Client:   s3Client,
-		transcoder: transcoder,
+		Querier:     querier,
+		s3Client:    s3Client,
+		transcoder:  transcoder,
+		fileStorage: fileStorage,
 	}
 }
 
@@ -122,9 +128,14 @@ func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
 		return
 	}
 
-	// TODO Get files from COS to local disk
+	filename := fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension)
+	destPath := h.fileStorage.RawFilePath(filename)
+	if err = h.s3Client.DownloadFile(c.Request.Context(), key, destPath); err != nil {
+		json.WriteErrorFromStringWithErrorObjectLog(c, http.StatusInternalServerError, "failed to download file", err)
+		return
+	}
 
-	// TODO Submit transcode job
+	h.transcoder.Submit(video.ID)
 
 	json.WriteSucces(c, http.StatusOK, "processing job submitted")
 }

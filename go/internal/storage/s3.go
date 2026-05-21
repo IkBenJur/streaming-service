@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -58,4 +60,27 @@ func (s3Storage *S3Storage) FileExists(ctx context.Context, key string) (bool, e
 	}
 
 	return true, nil
+}
+
+func (s3Storage *S3Storage) DownloadFile(ctx context.Context, key string, destPath string) error {
+	result, err := s3Storage.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s3Storage.bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("get object %s: %w", key, err)
+	}
+	defer result.Body.Close()
+
+	file, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("create file %s: %w", destPath, err)
+	}
+	defer file.Close()
+
+	if _, err = io.Copy(file, result.Body); err != nil {
+		return fmt.Errorf("write file %s: %w", destPath, err)
+	}
+
+	return nil
 }
