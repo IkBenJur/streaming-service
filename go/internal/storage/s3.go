@@ -2,11 +2,13 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type S3Storage struct {
@@ -38,4 +40,22 @@ func (s3Storage *S3Storage) GenerateRawUploadUrl(ctx context.Context, key string
 	})
 
 	return req.URL, err
+}
+
+func (s3Storage *S3Storage) FileExists(ctx context.Context, key string) (bool, error) {
+	_, err := s3Storage.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s3Storage.bucketName),
+		Key:    aws.String(key),
+	})
+
+	var notFound *types.NotFound
+	if err != nil && errors.As(err, &notFound) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }

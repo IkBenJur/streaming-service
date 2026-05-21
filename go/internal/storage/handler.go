@@ -12,15 +12,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Handler struct {
-	repo.Querier
-	s3Client S3Storage
+type Transcoder interface {
+	Submit(id pgtype.UUID)
 }
 
-func NewHandler(querier repo.Querier, s3Client S3Storage) *Handler {
+type Handler struct {
+	repo.Querier
+	s3Client   S3Storage
+	transcoder Transcoder
+}
+
+func NewHandler(querier repo.Querier, s3Client S3Storage, transcoder Transcoder) *Handler {
 	return &Handler{
-		Querier:  querier,
-		s3Client: s3Client,
+		Querier:    querier,
+		s3Client:   s3Client,
+		transcoder: transcoder,
 	}
 }
 
@@ -97,7 +103,24 @@ func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
 		return
 	}
 
-	// TODO Validate files exists in COS
+	video, err := h.Querier.FindVideoById(c, id)
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusNotFound, "failed to find video")
+		return
+	}
+
+	// Validate files exists in COS
+	key := GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
+	fileExists, err := h.s3Client.FileExists(c, key)
+	if err != nil {
+		json.WriteErrorFromStringWithErrorObjectLog(c, http.StatusInternalServerError, "failed to find file", err)
+		return
+	}
+
+	if !fileExists {
+		json.WriteErrorFromString(c, http.StatusNotFound, "failed to find file")
+		return
+	}
 
 	// TODO Get files from COS to local disk
 

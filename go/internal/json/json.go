@@ -17,6 +17,12 @@ func WriteErrorFromString(c *gin.Context, status int, error string) {
 	c.JSON(status, gin.H{"error": error})
 }
 
+// Want to have proper error in log but don't send message to client
+func WriteErrorFromStringWithErrorObjectLog(c *gin.Context, status int, errorString string, error error) {
+	slog.Error(error.Error())
+	c.JSON(status, gin.H{"error": errorString})
+}
+
 func WriteSucces(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{"message": message})
 }
