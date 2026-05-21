@@ -12,10 +12,11 @@ import (
 )
 
 type Application struct {
-	Port       string
-	Queries    repo.Querier
-	Transcoder videoProcessing.Transcoder
-	S3Client   *storage.S3Storage
+	Port         string
+	Queries      repo.Querier
+	Transcoder   videoProcessing.Transcoder
+	S3Client     *storage.S3Storage
+	LocalStorage bool
 }
 
 func (app *Application) Mount() http.Handler {
@@ -38,15 +39,13 @@ func (app *Application) Mount() http.Handler {
 		})
 	})
 
-	router.MaxMultipartMemory = 8 << 20
-
-	localStorage := storage.NewLocalStorage("./files")
-
-	videoProcessingHandler := videoProcessing.NewHandler(localStorage, app.Queries, app.Transcoder)
-	router.POST("/upload-video", videoProcessingHandler.UploadVideo)
-	router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
-
-	if app.S3Client != nil {
+	if app.LocalStorage {
+		router.MaxMultipartMemory = 8 << 20
+		localStore := storage.NewLocalStorage("./files")
+		videoProcessingHandler := videoProcessing.NewHandler(localStore, app.Queries, app.Transcoder)
+		router.POST("/upload-video", videoProcessingHandler.UploadVideo)
+		router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
+	} else {
 		storageHandler := storage.NewHandler(app.Queries, *app.S3Client, app.Transcoder)
 		router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
 		router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)

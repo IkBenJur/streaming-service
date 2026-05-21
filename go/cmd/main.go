@@ -84,10 +84,11 @@ func run(ctx context.Context) error {
 	)
 
 	api := Application{
-		Port:       env.GetEnv("PORT", "8080"),
-		Queries:    queries,
-		Transcoder: transcoder,
-		S3Client:   s3Client,
+		Port:         env.GetEnv("PORT", "8080"),
+		Queries:      queries,
+		Transcoder:   transcoder,
+		S3Client:     s3Client,
+		LocalStorage: runLocalStorage,
 	}
 
 	slog.Info("Starting server")
