@@ -12,11 +12,11 @@ import (
 )
 
 type Application struct {
-	Port         string
-	Queries      repo.Querier
-	Transcoder   videoProcessing.Transcoder
-	S3Client     *storage.S3Storage
-	LocalStorage bool
+	Port          string
+	Queries       repo.Querier
+	Transcoder    videoProcessing.Transcoder
+	StorageClient storage.StorageClient
+	LocalStorage  bool
 }
 
 func (app *Application) Mount() http.Handler {
@@ -24,7 +24,7 @@ func (app *Application) Mount() http.Handler {
 
 	router.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -39,17 +39,18 @@ func (app *Application) Mount() http.Handler {
 		})
 	})
 
-	// TODO We only run with s3 client for now but local storage should follow same interface as s3 so it can be used with the same handlers
+	storageHandler := storage.NewHandler(app.Queries, app.StorageClient, app.Transcoder)
+	router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
+	router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)
+
 	if app.LocalStorage {
+		localStore := app.StorageClient.(*storage.LocalStorage)
 		router.MaxMultipartMemory = 8 << 20
-		localStore := storage.NewLocalStorage("./files")
+		localUploadHandler := storage.NewLocalUploadHandler(localStore)
+		router.PUT("/videos/upload-raw/:filename", localUploadHandler.UploadRawFile)
+
 		videoProcessingHandler := videoProcessing.NewHandler(localStore, app.Queries, app.Transcoder)
-		router.POST("/upload-video", videoProcessingHandler.UploadVideo)
 		router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
-	} else {
-		storageHandler := storage.NewHandler(app.Queries, *app.S3Client, app.Transcoder)
-		router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
-		router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)
 	}
 
 	return router

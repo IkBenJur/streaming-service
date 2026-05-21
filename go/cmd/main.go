@@ -50,11 +50,17 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	runLocalStorage := env.GetEnvBool("RUN_LOCAL_STORAGE", false)
+	port := env.GetEnv("PORT", "8080")
+	runLocalStorage := true //env.GetEnvBool("RUN_LOCAL_STORAGE", false)
 
-	var s3Client *storage.S3Storage
+	var httpStorageClient storage.StorageClient
+	var transcodeStorageClient videotranscoder.StorageClient
+
 	if runLocalStorage {
 		slog.Warn("Running with local storage")
+		localStore := storage.NewLocalStorage("./files", fmt.Sprintf("http://localhost:%s", port))
+		httpStorageClient = localStore
+		transcodeStorageClient = localStore
 	} else {
 		slog.Info("Running with S3")
 		awsConfig, err := config.LoadDefaultConfig(ctx)
@@ -67,28 +73,24 @@ func run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		s3Client = storage.NewS3Storage(awsConfig, bucketName, "./files")
-	}
 
-	var storageClient videotranscoder.StorageClient
-	if s3Client != nil {
-		storageClient = s3Client
-	} else {
-		storageClient = storage.NewLocalStorage("./files")
+		s3Client := storage.NewS3Storage(awsConfig, bucketName, "./files")
+		httpStorageClient = s3Client
+		transcodeStorageClient = s3Client
 	}
 
 	transcoder := videotranscoder.NewTranscoder(
 		queries,
-		storageClient,
+		transcodeStorageClient,
 		env.GetEnvInt("TRANSCODE_JOB_NUMBER_OF_WORKERS", 2),
 	)
 
 	api := Application{
-		Port:         env.GetEnv("PORT", "8080"),
-		Queries:      queries,
-		Transcoder:   transcoder,
-		S3Client:     s3Client,
-		LocalStorage: runLocalStorage,
+		Port:          port,
+		Queries:       queries,
+		Transcoder:    transcoder,
+		StorageClient: httpStorageClient,
+		LocalStorage:  runLocalStorage,
 	}
 
 	slog.Info("Starting server")

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -9,13 +10,14 @@ import (
 )
 
 type LocalStorage struct {
-	basePath string
+	basePath      string
+	uploadBaseURL string
 }
 
-func NewLocalStorage(basePath string) *LocalStorage {
+func NewLocalStorage(basePath, uploadBaseURL string) *LocalStorage {
 	os.MkdirAll(filepath.Join(basePath, "raw"), 0755)
 	os.MkdirAll(filepath.Join(basePath, "hls"), 0755)
-	return &LocalStorage{basePath: basePath}
+	return &LocalStorage{basePath: basePath, uploadBaseURL: uploadBaseURL}
 }
 
 func (s *LocalStorage) SaveFileToRawStorage(r io.Reader, filename string) error {
@@ -35,11 +37,27 @@ func (s *LocalStorage) GetFile(ctx context.Context, key string) (io.ReadCloser, 
 }
 
 func (s *LocalStorage) GetRawKey(filename string) string {
-	return filepath.Join(s.basePath, "raw", filename)
+	return fmt.Sprintf("raw/%s", filename)
 }
 
 func (s *LocalStorage) GetHlsKey(id string) string {
-	return filepath.Join(s.basePath, "hls", id)
+	return fmt.Sprintf("hls/%s", id)
+}
+
+func (s *LocalStorage) FileExists(_ context.Context, key string) (bool, error) {
+	_, err := os.Stat(filepath.Join(s.basePath, key))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *LocalStorage) GenerateRawUploadUrl(_ context.Context, key string) (string, error) {
+	filename := filepath.Base(key)
+	return fmt.Sprintf("%s/videos/upload-raw/%s", s.uploadBaseURL, filename), nil
 }
 
 func (s *LocalStorage) GetRawFilePath(filename string) string {
@@ -64,6 +82,6 @@ func (s *LocalStorage) DeleteRawLocalFile(_ context.Context, localPath string) e
 	return os.Remove(localPath)
 }
 
-func (s *LocalStorage) DeleteHlsLocalFolder(filePath string) error {
-	return os.RemoveAll(filePath)
+func (s *LocalStorage) DeleteHlsLocalFolder(_ string) error {
+	return nil
 }

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,21 +13,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type StorageClient interface {
+	GenerateRawUploadUrl(ctx context.Context, key string) (string, error)
+	FileExists(ctx context.Context, key string) (bool, error)
+	GetRawKey(filename string) string
+}
+
 type Transcoder interface {
 	Submit(id pgtype.UUID)
 }
 
 type Handler struct {
 	repo.Querier
-	s3Client   S3Storage
-	transcoder Transcoder
+	storageClient StorageClient
+	transcoder    Transcoder
 }
 
-func NewHandler(querier repo.Querier, s3Client S3Storage, transcoder Transcoder) *Handler {
+func NewHandler(querier repo.Querier, storageClient StorageClient, transcoder Transcoder) *Handler {
 	return &Handler{
-		Querier:    querier,
-		s3Client:   s3Client,
-		transcoder: transcoder,
+		Querier:       querier,
+		storageClient: storageClient,
+		transcoder:    transcoder,
 	}
 }
 
@@ -72,8 +79,8 @@ func (h *Handler) CreateVideoAndGetUploadUrl(c *gin.Context) {
 		return
 	}
 
-	key := GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, fileExentension))
-	presignedUrl, err := h.s3Client.GenerateRawUploadUrl(c, key)
+	key := h.storageClient.GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, fileExentension))
+	presignedUrl, err := h.storageClient.GenerateRawUploadUrl(c, key)
 	if err != nil {
 		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to create url")
 		return
@@ -109,9 +116,8 @@ func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
 		return
 	}
 
-	// Validate files exists in COS
-	key := GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
-	fileExists, err := h.s3Client.FileExists(c, key)
+	key := h.storageClient.GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
+	fileExists, err := h.storageClient.FileExists(c, key)
 	if err != nil {
 		json.WriteErrorFromStringWithErrorObjectLog(c, http.StatusInternalServerError, "failed to find file", err)
 		return
@@ -125,4 +131,21 @@ func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
 	h.transcoder.Submit(video.ID)
 
 	json.WriteSucces(c, http.StatusOK, "processing job submitted")
+}
+
+type LocalUploadHandler struct {
+	localStore *LocalStorage
+}
+
+func NewLocalUploadHandler(localStore *LocalStorage) *LocalUploadHandler {
+	return &LocalUploadHandler{localStore: localStore}
+}
+
+func (h *LocalUploadHandler) UploadRawFile(c *gin.Context) {
+	filename := c.Param("filename")
+	if err := h.localStore.SaveFileToRawStorage(c.Request.Body, filename); err != nil {
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to save file")
+		return
+	}
+	c.Status(http.StatusOK)
 }
