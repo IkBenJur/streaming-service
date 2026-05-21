@@ -12,7 +12,6 @@ import (
 	"github.com/IkBenJur/streaming-service/internal/postgres"
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/storage"
-	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	videotranscoder "github.com/IkBenJur/streaming-service/internal/videoTranscoder"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,11 +50,6 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	transcoder := videotranscoder.NewTranscoder(
-		videoProcessing.NewLocalStorage("./files", queries),
-		env.GetEnvInt("TRANSCODE_JOB_NUMBER_OF_WORKERS", 2),
-	)
-
 	runLocalStorage := env.GetEnvBool("RUN_LOCAL_STORAGE", false)
 
 	var s3Client *storage.S3Storage
@@ -73,17 +67,27 @@ func run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		s3Client = storage.NewS3Storage(
-			awsConfig,
-			bucketName,
-		)
+		s3Client = storage.NewS3Storage(awsConfig, bucketName, "./files")
 	}
+
+	var storageClient videotranscoder.StorageClient
+	if s3Client != nil {
+		storageClient = s3Client
+	} else {
+		storageClient = storage.NewLocalStorage("./files")
+	}
+
+	transcoder := videotranscoder.NewTranscoder(
+		queries,
+		storageClient,
+		env.GetEnvInt("TRANSCODE_JOB_NUMBER_OF_WORKERS", 2),
+	)
 
 	api := Application{
 		Port:       env.GetEnv("PORT", "8080"),
 		Queries:    queries,
 		Transcoder: transcoder,
-		S3Client:   *s3Client,
+		S3Client:   s3Client,
 	}
 
 	slog.Info("Starting server")

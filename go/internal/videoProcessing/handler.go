@@ -1,9 +1,9 @@
 package videoProcessing
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -16,18 +16,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type FileStore interface {
+	SaveFileToRawStorage(r io.Reader, filename string) error
+	GetFile(ctx context.Context, key string) (io.ReadCloser, error)
+}
+
 type Transcoder interface {
 	Submit(id pgtype.UUID)
 }
 
 type Handler struct {
-	service    VideoProcessingService
+	querier    repo.Querier
+	fileStore  FileStore
 	transcoder Transcoder
 }
 
-func NewHandler(service VideoProcessingService, transcoder Transcoder) *Handler {
+func NewHandler(fileStore FileStore, querier repo.Querier, transcoder Transcoder) *Handler {
 	return &Handler{
-		service:    service,
+		querier:    querier,
+		fileStore:  fileStore,
 		transcoder: transcoder,
 	}
 }
@@ -40,7 +47,7 @@ func (h *Handler) GetVideoStream(c *gin.Context) {
 	}
 
 	videoId := pgtype.UUID{Bytes: [16]byte(id), Valid: true}
-	video, err := h.service.FindVideoById(c, videoId)
+	video, err := h.querier.FindVideoById(c, videoId)
 	if err != nil {
 		json.WriteErrorFromString(c, http.StatusNotFound, "invalid id")
 		return
@@ -58,8 +65,7 @@ func (h *Handler) GetVideoStream(c *gin.Context) {
 	}
 
 	key := filepath.Join("hls", fmt.Sprintf("%x", videoId.Bytes), file)
-	slog.Info(key)
-	rc, err := h.service.GetFile(c.Request.Context(), key)
+	rc, err := h.fileStore.GetFile(c.Request.Context(), key)
 	if err != nil {
 		json.WriteErrorFromString(c, http.StatusNotFound, "file not found")
 		return
@@ -87,7 +93,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	id, err := h.service.CreateVideo(c.Request.Context(), repo.CreateVideoParams{
+	id, err := h.querier.CreateVideo(c.Request.Context(), repo.CreateVideoParams{
 		Status:        repo.VideoStatuses.Pending,
 		FileExtension: fileExtension,
 	})
@@ -97,7 +103,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 	}
 
 	filename := fmt.Sprintf("%x.%s", id.Bytes, fileExtension)
-	if err = h.service.SaveFileToRawStorage(fileFormPart, filename); err != nil {
+	if err = h.fileStore.SaveFileToRawStorage(fileFormPart, filename); err != nil {
 		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to save video")
 		return
 	}

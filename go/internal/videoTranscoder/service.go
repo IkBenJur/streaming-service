@@ -9,23 +9,36 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
-	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type VideoTranscoder struct {
-	service   videoProcessing.VideoProcessingService
-	semaphore chan struct{}
+type StorageClient interface {
+	GetRawKey(string) string
+	GetHlsKey(string) string
+	GetRawFilePath(string) string
+	GetHlsFilePath(string) string
+	DeleteRawLocalFile(ctx context.Context, localPath string) error
+	UploadFile(ctx context.Context, localPath string, key string) error
+	DownloadFile(ctx context.Context, key string, destPath string) error
+	DeleteHlsLocalFolder(filePath string) error
 }
 
-func NewTranscoder(service videoProcessing.VideoProcessingService, maxNrOfWorkers int) *VideoTranscoder {
+type VideoTranscoder struct {
+	repo.Querier
+	storageClient StorageClient
+	semaphore     chan struct{}
+}
+
+func NewTranscoder(querier repo.Querier, storageClient StorageClient, maxNrOfWorkers int) *VideoTranscoder {
 	return &VideoTranscoder{
-		service:   service,
-		semaphore: make(chan struct{}, maxNrOfWorkers),
+		Querier:       querier,
+		storageClient: storageClient,
+		semaphore:     make(chan struct{}, maxNrOfWorkers),
 	}
 }
 
@@ -39,21 +52,28 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		logger.Info("transcode job start")
 
 		// Update status to processing
-		t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+		t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Processing,
 		})
 
-		video, err := t.service.FindVideoById(ctx, id)
+		video, err := t.Querier.FindVideoById(ctx, id)
 		if err != nil {
 			logger.Error(fmt.Sprintf("transcode failed %s", err.Error()))
 			return
 		}
 
+		logger.Info("Getting file start")
+		key := t.storageClient.GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
+		filename := fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension)
+		rawFilepath := t.storageClient.GetRawFilePath(filename)
+		t.storageClient.DownloadFile(ctx, key, rawFilepath)
+		logger.Info("Getting file end")
+
 		logger.Info("transcode start")
 		if err = t.transcodeVideo(ctx, video); err != nil {
 			logger.Error(err.Error())
-			err = t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+			err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
@@ -64,12 +84,27 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		}
 		logger.Info("transcode finished")
 
-		rawPath := t.service.RawFilePath(fmt.Sprintf("%x.%s", video.ID.Bytes, video.FileExtension))
-		if err = os.Remove(rawPath); err != nil {
+		logger.Info("delete local file raw start")
+		if err = t.storageClient.DeleteRawLocalFile(ctx, rawFilepath); err != nil {
 			logger.Error(fmt.Sprintf("failed to remove raw file %s", err.Error()))
 		}
+		logger.Info("delete local file raw end")
 
-		if err = t.service.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+		logger.Info("HLS files upload start")
+		if err = t.uploadHLSFiles(ctx, fmt.Sprintf("%x", video.ID.Bytes)); err != nil {
+			logger.Error(err.Error())
+			err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+				ID:     id,
+				Status: repo.VideoStatuses.Failed,
+			})
+			if err != nil {
+				logger.Error(fmt.Sprintf("failed to update video status %s", err.Error()))
+			}
+			return
+		}
+		logger.Info("HLS files upload end")
+
+		if err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Finished,
 		}); err != nil {
@@ -80,17 +115,36 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 	}()
 }
 
+func (t *VideoTranscoder) uploadHLSFiles(ctx context.Context, videoID string) error {
+	outputPath := t.storageClient.GetHlsFilePath(videoID)
+
+	entries, err := os.ReadDir(outputPath)
+	if err != nil {
+		return fmt.Errorf("read HLS output dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		localPath := filepath.Join(outputPath, entry.Name())
+		key := fmt.Sprintf("hls/%s/%s", videoID, entry.Name())
+		if err = t.storageClient.UploadFile(ctx, localPath, key); err != nil {
+			return fmt.Errorf("upload %s: %w", entry.Name(), err)
+		}
+	}
+
+	return t.storageClient.DeleteHlsLocalFolder(outputPath)
+}
+
 func (t *VideoTranscoder) transcodeVideo(c context.Context, video repo.Video) error {
-	filepath := t.service.RawFilePath(fmt.Sprintf("%x.%s", video.ID.Bytes, video.FileExtension))
+	filepath := t.storageClient.GetRawFilePath(fmt.Sprintf("%x.%s", video.ID.Bytes, video.FileExtension))
 	durationInUs, err := determineTranscodeDurationInUs(c, filepath)
 	if err != nil {
 		return fmt.Errorf("transcode failed to determine duration %s", err.Error())
 	}
 
-	outputPath, err := t.service.HLSOutputPath(fmt.Sprintf("%x", video.ID.Bytes))
-	if err != nil {
-		return fmt.Errorf("transcode failed to create output path %s", err.Error())
-	}
+	outputPath := t.storageClient.GetHlsFilePath(fmt.Sprintf("%x", video.ID.Bytes))
 
 	cmd := exec.CommandContext(c,
 		"ffmpeg",
@@ -130,7 +184,7 @@ scanLoop:
 		case "out_time_ms":
 			ms, _ := strconv.ParseInt(value, 10, 64)
 			progress := ms * 100 / int64(durationInUs)
-			err = t.service.UpdateVideoProgress(c,
+			err = t.Querier.UpdateVideoProgress(c,
 				repo.UpdateVideoProgressParams{
 					ID:       video.ID,
 					Progress: pgtype.Int4{Int32: int32(progress), Valid: true},

@@ -61,7 +61,8 @@ func (m *mockTranscoder) Submit(id pgtype.UUID) {
 
 func TestUploadVideo_ValidateFileExtension(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewHandler(&mockService{}, &mockTranscoder{})
+	ms := &mockService{}
+	h := NewHandler(ms, ms, &mockTranscoder{})
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
@@ -88,14 +89,15 @@ func TestUploadVideo_StatusOk(t *testing.T) {
 	id := uuid.New()
 	videoId := pgtype.UUID{Bytes: [16]byte(id), Valid: true}
 	gin.SetMode(gin.TestMode)
-	h := NewHandler(&mockService{
+	ms := &mockService{
 		createVideo: func(ctx context.Context, arg repo.CreateVideoParams) (pgtype.UUID, error) {
 			return videoId, nil
 		},
 		saveFileToRawStorage: func(r io.Reader, filename string) error {
 			return nil
 		},
-	}, &mockTranscoder{})
+	}
+	h := NewHandler(ms, ms, &mockTranscoder{})
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
@@ -119,7 +121,8 @@ func TestUploadVideo_StatusOk(t *testing.T) {
 
 func TestGetVideoStream_InvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewHandler(&mockService{}, &mockTranscoder{})
+	ms := &mockService{}
+	h := NewHandler(ms, ms, &mockTranscoder{})
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
@@ -137,14 +140,15 @@ func TestGetVideoStream_StatusNotFinished(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	id := uuid.New()
-	h := NewHandler(&mockService{
+	ms := &mockService{
 		findVideoById: func(ctx context.Context, id pgtype.UUID) (repo.Video, error) {
 			return repo.Video{
 				ID:     id,
 				Status: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, // any non-zero value != uninitialized VideoStatuses.Finished
 			}, nil
 		},
-	}, &mockTranscoder{})
+	}
+	h := NewHandler(ms, ms, &mockTranscoder{})
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
@@ -163,14 +167,15 @@ func TestGetVideoStream_StatusOk(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	id := uuid.New()
-	h := NewHandler(&mockService{
+	ms := &mockService{
 		findVideoById: func(ctx context.Context, id pgtype.UUID) (repo.Video, error) {
 			return repo.Video{}, nil
 		},
 		getFile: func(ctx context.Context, key string) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader("fake content")), nil
 		},
-	}, &mockTranscoder{})
+	}
+	h := NewHandler(ms, ms, &mockTranscoder{})
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)

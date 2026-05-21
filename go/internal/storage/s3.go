@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,20 +19,27 @@ type S3Storage struct {
 	client        s3.Client
 	presignClient s3.PresignClient
 	bucketName    string
+	localTempPath string
 }
 
-func NewS3Storage(config aws.Config,
-	bucketName string) *S3Storage {
+func NewS3Storage(config aws.Config, bucketName string, localTempPath string) *S3Storage {
 	client := s3.NewFromConfig(config)
+	os.MkdirAll(filepath.Join(localTempPath, "raw"), 0755)
+	os.MkdirAll(filepath.Join(localTempPath, "hls"), 0755)
 	return &S3Storage{
 		client:        *client,
 		presignClient: *s3.NewPresignClient(client),
 		bucketName:    bucketName,
+		localTempPath: localTempPath,
 	}
 }
 
 func GetRawKey(filename string) string {
 	return fmt.Sprintf("raw/%s", filename)
+}
+
+func GetHLSKey(id, filename string) string {
+	return fmt.Sprintf("hls/%s/%s", id, filename)
 }
 
 func (s3Storage *S3Storage) GenerateRawUploadUrl(ctx context.Context, key string) (string, error) {
@@ -83,4 +92,52 @@ func (s3Storage *S3Storage) DownloadFile(ctx context.Context, key string, destPa
 	}
 
 	return nil
+}
+
+func (s3Storage *S3Storage) UploadFile(ctx context.Context, localPath string, key string) error {
+	file, err := os.Open(localPath)
+	if err != nil {
+		return fmt.Errorf("open file %s: %w", localPath, err)
+	}
+	defer file.Close()
+
+	contentType := mime.TypeByExtension(filepath.Ext(localPath))
+
+	_, err = s3Storage.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s3Storage.bucketName),
+		Key:         aws.String(key),
+		Body:        file,
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return fmt.Errorf("upload file %s: %w", key, err)
+	}
+
+	return nil
+}
+
+func (s3Storage *S3Storage) GetRawKey(filename string) string {
+	return fmt.Sprintf("raw/%s", filename)
+}
+
+func (s3Storage *S3Storage) GetHlsKey(id string) string {
+	return fmt.Sprintf("hls/%s", id)
+}
+
+func (s3Storage *S3Storage) GetRawFilePath(filename string) string {
+	return filepath.Join(s3Storage.localTempPath, "raw", filename)
+}
+
+func (s3Storage *S3Storage) GetHlsFilePath(id string) string {
+	path := filepath.Join(s3Storage.localTempPath, "hls", id)
+	os.MkdirAll(path, 0755)
+	return path
+}
+
+func (s3Storage *S3Storage) DeleteRawLocalFile(_ context.Context, localPath string) error {
+	return os.Remove(localPath)
+}
+
+func (s3Storage *S3Storage) DeleteHlsLocalFolder(filePath string) error {
+	return os.RemoveAll(filePath)
 }
