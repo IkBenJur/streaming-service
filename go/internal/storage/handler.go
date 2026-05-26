@@ -15,6 +15,7 @@ import (
 
 type StorageClient interface {
 	GenerateRawUploadUrl(ctx context.Context, key string) (string, error)
+	GeneratePresignedGetURL(ctx context.Context, key string) (string, error)
 	FileExists(ctx context.Context, key string) (bool, error)
 	GetRawKey(filename string) string
 }
@@ -133,6 +134,40 @@ func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
 	json.WriteSucces(c, http.StatusOK, "processing job submitted")
 }
 
+func (h *Handler) GetSegmentSignedUrl(c *gin.Context) {
+	parsed, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusBadRequest, "invalid id format")
+		return
+	}
+	id := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	video, err := h.Querier.FindVideoById(c, id)
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusNotFound, "video not found")
+		return
+	}
+	if video.Status != repo.VideoStatuses.Finished {
+		json.WriteErrorFromString(c, http.StatusBadRequest, "video is not finished")
+		return
+	}
+
+	file := c.Param("file")
+	if strings.ContainsAny(file, "/\\") {
+		json.WriteErrorFromString(c, http.StatusBadRequest, "invalid file")
+		return
+	}
+
+	key := fmt.Sprintf("hls/%x/%s", id.Bytes, file)
+	signedUrl, err := h.storageClient.GeneratePresignedGetURL(c, key)
+	if err != nil {
+		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to generate signed url")
+		return
+	}
+
+	json.WriteJSON(c, http.StatusOK, gin.H{"signed_url": signedUrl})
+}
+
 type LocalUploadHandler struct {
 	localStore *LocalStorage
 }
@@ -148,4 +183,29 @@ func (h *LocalUploadHandler) UploadRawFile(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusOK)
+}
+
+func (h *LocalUploadHandler) ServeHlsFile(c *gin.Context) {
+	id := c.Param("id")
+	file := c.Param("file")
+
+	if strings.ContainsAny(id, "/\\") || strings.ContainsAny(file, "/\\") {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	key := fmt.Sprintf("hls/%s/%s", id, file)
+	rc, err := h.localStore.GetFile(c.Request.Context(), key)
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	defer rc.Close()
+
+	contentType := "video/mp4"
+	if strings.HasSuffix(file, ".m3u8") {
+		contentType = "application/vnd.apple.mpegurl"
+	}
+
+	c.DataFromReader(http.StatusOK, -1, contentType, rc, nil)
 }

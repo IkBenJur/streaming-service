@@ -7,14 +7,13 @@ import (
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/storage"
-	"github.com/IkBenJur/streaming-service/internal/videoProcessing"
 	"github.com/gin-gonic/gin"
 )
 
 type Application struct {
 	Port          string
 	Queries       repo.Querier
-	Transcoder    videoProcessing.Transcoder
+	Transcoder    storage.Transcoder
 	StorageClient storage.StorageClient
 	LocalStorage  bool
 }
@@ -42,15 +41,14 @@ func (app *Application) Mount() http.Handler {
 	storageHandler := storage.NewHandler(app.Queries, app.StorageClient, app.Transcoder)
 	router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
 	router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)
+	router.GET("/videos/:id/stream/:file/signed-url", storageHandler.GetSegmentSignedUrl)
 
 	if app.LocalStorage {
 		localStore := app.StorageClient.(*storage.LocalStorage)
 		router.MaxMultipartMemory = 8 << 20
 		localUploadHandler := storage.NewLocalUploadHandler(localStore)
 		router.PUT("/videos/upload-raw/:filename", localUploadHandler.UploadRawFile)
-
-		videoProcessingHandler := videoProcessing.NewHandler(localStore, app.Queries, app.Transcoder)
-		router.GET("/video-stream/:id/:file", videoProcessingHandler.GetVideoStream)
+		router.GET("/videos/hls/:id/:file", localUploadHandler.ServeHlsFile)
 	}
 
 	return router

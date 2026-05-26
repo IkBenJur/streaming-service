@@ -35,13 +35,18 @@ func (m *mockQuerier) FindVideoById(ctx context.Context, id pgtype.UUID) (repo.V
 }
 
 type mockStorageClient struct {
-	generateRawUploadUrl func(ctx context.Context, key string) (string, error)
-	fileExists           func(ctx context.Context, key string) (bool, error)
-	getRawKey            func(filename string) string
+	generateRawUploadUrl    func(ctx context.Context, key string) (string, error)
+	generatePresignedGetURL func(ctx context.Context, key string) (string, error)
+	fileExists              func(ctx context.Context, key string) (bool, error)
+	getRawKey               func(filename string) string
 }
 
 func (m *mockStorageClient) GenerateRawUploadUrl(ctx context.Context, key string) (string, error) {
 	return m.generateRawUploadUrl(ctx, key)
+}
+
+func (m *mockStorageClient) GeneratePresignedGetURL(ctx context.Context, key string) (string, error) {
+	return m.generatePresignedGetURL(ctx, key)
 }
 
 func (m *mockStorageClient) FileExists(ctx context.Context, key string) (bool, error) {

@@ -85,3 +85,7 @@ func (s *LocalStorage) DeleteRawLocalFile(_ context.Context, localPath string) e
 func (s *LocalStorage) DeleteHlsLocalFolder(_ string) error {
 	return nil
 }
+
+func (s *LocalStorage) GeneratePresignedGetURL(_ context.Context, key string) (string, error) {
+	return fmt.Sprintf("%s/videos/%s", s.uploadBaseURL, key), nil
+}

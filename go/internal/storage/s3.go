@@ -34,14 +34,6 @@ func NewS3Storage(config aws.Config, bucketName string, localTempPath string) *S
 	}
 }
 
-func GetRawKey(filename string) string {
-	return fmt.Sprintf("raw/%s", filename)
-}
-
-func GetHLSKey(id, filename string) string {
-	return fmt.Sprintf("hls/%s/%s", id, filename)
-}
-
 func (s3Storage *S3Storage) GenerateRawUploadUrl(ctx context.Context, key string) (string, error) {
 	req, err := s3Storage.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s3Storage.bucketName),
@@ -140,4 +132,17 @@ func (s3Storage *S3Storage) DeleteRawLocalFile(_ context.Context, localPath stri
 
 func (s3Storage *S3Storage) DeleteHlsLocalFolder(filePath string) error {
 	return os.RemoveAll(filePath)
+}
+
+func (s3Storage *S3Storage) GeneratePresignedGetURL(ctx context.Context, key string) (string, error) {
+	req, err := s3Storage.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s3Storage.bucketName),
+		Key:    aws.String(key),
+	}, func(po *s3.PresignOptions) {
+		po.Expires = 1 * time.Hour
+	})
+	if err != nil {
+		return "", err
+	}
+	return req.URL, nil
 }
