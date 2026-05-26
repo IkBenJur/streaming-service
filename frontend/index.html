@@ -92,9 +92,56 @@
 
     let hls = null;
 
+    function createSignedLoader(videoId) {
+      return class SignedLoader {
+        constructor(config) {
+          this.controller = null;
+          this.stats = {
+            aborted: false, loaded: 0, retry: 0, total: 0, chunkCount: 0, bwEstimate: 0,
+            loading: { start: 0, first: 0, end: 0 },
+            parsing: { start: 0, end: 0 },
+            buffering: { start: 0, first: 0, end: 0 },
+          };
+        }
+
+        async load(context, config, callbacks) {
+          this.stats.loading.start = performance.now();
+          this.controller = new AbortController();
+          const signal = this.controller.signal;
+
+          try {
+            const filename = context.url.split('/').pop().split('?')[0];
+            const sigRes = await fetch(`${BACKEND_URL}/videos/${videoId}/stream/${filename}/signed-url`, { signal });
+            if (!sigRes.ok) throw new Error(`signing endpoint returned ${sigRes.status}`);
+            const { signed_url } = await sigRes.json();
+
+            const res = await fetch(signed_url, { signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = context.responseType === 'arraybuffer'
+              ? await res.arrayBuffer()
+              : await res.text();
+
+            const t = performance.now();
+            this.stats.loading.first = t;
+            this.stats.loading.end = t;
+            this.stats.loaded = this.stats.total = data.byteLength ?? data.length;
+
+            callbacks.onSuccess({ data, url: signed_url }, this.stats, context, null);
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              callbacks.onError({ code: 0, text: err.message }, context, null, this.stats);
+            }
+          }
+        }
+
+        abort() { this.controller?.abort(); }
+        destroy() { this.controller?.abort(); }
+      };
+    }
+
     function loadVideo() {
       const id = document.getElementById('videoId').value.trim();
-      const status = document.getElementById('status');
       const video = document.getElementById('player');
 
       if (!id) {
@@ -102,29 +149,24 @@
         return;
       }
 
-      const src = `${BACKEND_URL}/video-stream/${id}/playlist.m3u8`;
-      setStatus(`Loading ${src} …`);
-
-      if (hls) {
-        hls.destroy();
-        hls = null;
-      }
+      setStatus('Loading…');
+      if (hls) { hls.destroy(); hls = null; }
 
       if (Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(src);
+        hls = new Hls({ loader: createSignedLoader(id) });
+        hls.loadSource(`${BACKEND_URL}/videos/${id}/stream/playlist.m3u8`);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setStatus('');
-          video.play();
-        });
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (data.fatal) setStatus(`Error: ${data.details}`, true);
-        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { setStatus(''); video.play(); });
+        hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) setStatus(`Error: ${data.details}`, true); });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = src;
-        video.addEventListener('loadedmetadata', () => { setStatus(''); video.play(); }, { once: true });
-        video.addEventListener('error', () => setStatus('Playback error.', true), { once: true });
+        fetch(`${BACKEND_URL}/videos/${id}/stream/playlist.m3u8/signed-url`)
+          .then(r => r.json())
+          .then(({ signed_url }) => {
+            video.src = signed_url;
+            video.addEventListener('loadedmetadata', () => { setStatus(''); video.play(); }, { once: true });
+            video.addEventListener('error', () => setStatus('Playback error.', true), { once: true });
+          })
+          .catch(err => setStatus(`Error: ${err.message}`, true));
       } else {
         setStatus('HLS is not supported in this browser.', true);
       }
