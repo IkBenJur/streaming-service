@@ -134,6 +134,23 @@ func (s3Storage *S3Storage) DeleteHlsLocalFolder(filePath string) error {
 	return os.RemoveAll(filePath)
 }
 
+func (s3Storage *S3Storage) EnsureCORSPolicy(ctx context.Context) error {
+	_, err := s3Storage.client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
+		Bucket: aws.String(s3Storage.bucketName),
+		CORSConfiguration: &types.CORSConfiguration{
+			CORSRules: []types.CORSRule{
+				{
+					AllowedHeaders: []string{"*"},
+					AllowedMethods: []string{"GET"},
+					AllowedOrigins: []string{"*"},
+					MaxAgeSeconds:  aws.Int32(3600),
+				},
+			},
+		},
+	})
+	return err
+}
+
 func (s3Storage *S3Storage) GeneratePresignedGetURL(ctx context.Context, key string) (string, error) {
 	req, err := s3Storage.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s3Storage.bucketName),

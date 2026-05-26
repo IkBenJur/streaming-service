@@ -51,7 +51,7 @@ func run(ctx context.Context) error {
 	}
 
 	port := env.GetEnv("PORT", "8080")
-	runLocalStorage := true //env.GetEnvBool("RUN_LOCAL_STORAGE", false)
+	runLocalStorage := env.GetEnvBool("RUN_LOCAL_STORAGE", false)
 
 	var httpStorageClient storage.StorageClient
 	var transcodeStorageClient videotranscoder.StorageClient
@@ -75,6 +75,9 @@ func run(ctx context.Context) error {
 		}
 
 		s3Client := storage.NewS3Storage(awsConfig, bucketName, "./files")
+		if err := s3Client.EnsureCORSPolicy(ctx); err != nil {
+			slog.Warn("Failed to set bucket CORS policy", "error", err)
+		}
 		httpStorageClient = s3Client
 		transcodeStorageClient = s3Client
 	}
