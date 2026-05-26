@@ -150,19 +150,35 @@ To upload a file directly via a presigned URL (useful for testing):
 Get a presigned URL from the API:
 
 ```sh
-curl -s -X POST http://localhost:8080/create-video-and-get-upload-url \
+curl -s -X POST http://localhost:8080/videos/create-and-get-upload-url \
   -H "Content-Type: application/json" \
+  -d '{"title": "my video", "file_name": "video.mp4"}' \
   | jq -r '."upload-url"'
 ```
 
 ## API
 
+### Core endpoints
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| POST | `/upload-video` | Upload a video file (multipart form) |
-| GET | `/stream-video/:fileName` | Stream a transcoded video |
-| POST | `/create-video-and-get-upload-url` | Create a video entry and return a presigned S3 upload URL |
+| POST | `/videos/create-and-get-upload-url` | Create a video entry and return a presigned S3 upload URL |
+| POST | `/videos/:id/process` | Trigger transcoding for a video after it has been uploaded |
+| GET | `/videos/:id/stream/:file/signed-url` | Get a short-lived presigned URL for a HLS segment or playlist file |
+
+### Local storage only (`RUN_LOCAL_STORAGE=true`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| PUT | `/videos/upload-raw/:filename` | Upload a raw video file directly to the server |
+| GET | `/videos/hls/:id/:file` | Serve a HLS segment or playlist file from local disk |
+
+### Upload flow
+
+1. `POST /videos/create-and-get-upload-url` — create a DB entry and get a presigned PUT URL.  Body: `{ "title": "...", "file_name": "video.mp4" }`.  Response includes `id` and `upload-url`.
+2. Upload the file to the presigned URL (e.g. with `curl -X PUT`).
+3. `POST /videos/:id/process` — submit the transcoding job once the upload is complete.
 
 ## Project Structure
 
@@ -170,10 +186,12 @@ curl -s -X POST http://localhost:8080/create-video-and-get-upload-url \
 go/
 ├── cmd/               # Entry point and HTTP routing
 ├── internal/
+│   ├── env/               # Environment variable loading
+│   ├── json/              # JSON response helpers
 │   ├── postgres/
 │   │   ├── migrations/    # goose migration files
 │   │   └── sqlc/          # sqlc-generated code + queries
-│   ├── videoProcessing/   # Upload and streaming handlers
+│   ├── storage/           # StorageClient interface, S3 + local implementations, HTTP handlers
 │   └── videoTranscoder/   # Async transcoding worker
 ├── docker-compose.yaml
 ├── sqlc.yml

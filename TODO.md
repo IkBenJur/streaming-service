@@ -9,6 +9,7 @@ Grouped by urgency, then difficulty within each group.
 | # | Task | Difficulty | Notes |
 |---|------|------------|-------|
 | 4 | Graceful shutdown: in-flight transcodes won't cancel on shutdown — process can hang | Medium | `videoTranscoder/service.go` — store a server-lifetime context on `VideoTranscoder`, set at construction time from `main`'s signal context |
+| 24 | `DownloadFile` error is silently ignored — transcode proceeds on a missing/empty file | Easy | `videoTranscoder/service.go:70` — check the error and abort the job |
 
 ---
 
@@ -33,10 +34,11 @@ Grouped by urgency, then difficulty within each group.
 
 | # | Task | Difficulty | Notes |
 |---|------|------------|-------|
-| 15 | Clean up partial HLS segments from disk when transcode fails | Easy | `videoTranscoder/service.go` — currently leaves orphaned files |
-| 16 | Fix `WriteSucces` typo → `WriteSuccess` | Trivial | `internal/json/json.go:14` |
+| 15 | Clean up local temp files on transcode or upload failure | Easy | `videoTranscoder/service.go:76-104` — on failure the downloaded raw file and partial HLS folder are left on disk; add cleanup with `defer` or explicit cleanup in the error paths |
+| 16 | Fix `WriteSucces` typo → `WriteSuccess` | Trivial | `internal/json/json.go:26` |
 | 17 | Fix `go.mod`: `go 1.26.2` doesn't exist, and all deps are marked `// indirect` — run `go mod tidy` | Trivial | `go.mod:3` |
 | 19 | Replace wildcard CORS with a configurable allowlist | Easy | `api.go:24` |
+| 25 | Remove empty `internal/videoProcessing/` directory | Trivial | Handlers were moved to `internal/storage/` — the directory is now empty |
 
 ---
 
