@@ -28,3 +28,9 @@ Thumbs.db
 
 /go/files
 /test-files
+
+/node_modules/
+
+# React Router
+/.react-router/
+/build/
