@@ -40,7 +40,6 @@ Build and run from the **project root** (`streaming-service/`).
 ```bash
 # Build
 docker build -f build/Dockerfile.frontend \
-  --build-arg VITE_API_URL=http://your-backend-host:port \
   -t streaming-service-frontend \
   frontend/
 
@@ -54,7 +53,6 @@ If the backend is on localhost, use `host.docker.internal` on Linux:
 
 ```bash
 docker build -f build/Dockerfile.frontend \
-  --build-arg VITE_API_URL=http://host.docker.internal:8080 \
   -t streaming-service-frontend \
   frontend/
 
