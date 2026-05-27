@@ -159,6 +159,17 @@ func (h *Handler) GetSegmentSignedUrl(c *gin.Context) {
 	}
 
 	key := fmt.Sprintf("hls/%x/%s", id.Bytes, file)
+	fileExists, err := h.storageClient.FileExists(c, key)
+	if err != nil {
+		json.WriteErrorFromStringWithErrorObjectLog(c, http.StatusInternalServerError, "failed to find file", err)
+		return
+	}
+
+	if !fileExists {
+		json.WriteErrorFromString(c, http.StatusNotFound, "failed to find file")
+		return
+	}
+
 	signedUrl, err := h.storageClient.GeneratePresignedGetURL(c, key)
 	if err != nil {
 		json.WriteErrorFromString(c, http.StatusInternalServerError, "failed to generate signed url")
