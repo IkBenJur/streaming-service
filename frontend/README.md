@@ -1,87 +1,67 @@
-# Welcome to React Router!
+# Streaming Service — Frontend
 
-A modern, production-ready template for building full-stack React applications using React Router.
+React Router v7 (SSR) frontend for the streaming service.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+## Requirements
 
-## Features
+- Node.js 26+
+- Backend API running (see `VITE_API_URL` below)
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+## Environment variables
 
-## Getting Started
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_API_URL` | Yes | Base URL of the backend API (e.g. `http://localhost:8080`) |
 
-### Installation
-
-Install the dependencies:
+## Development
 
 ```bash
 npm install
-```
-
-### Development
-
-Start the development server with HMR:
-
-```bash
 npm run dev
 ```
 
-Your application will be available at `http://localhost:5173`.
+Available at `http://localhost:5173`.
 
-## Building for Production
-
-Create a production build:
+## Production (local)
 
 ```bash
 npm run build
+VITE_API_URL=http://localhost:8080 npm run start
 ```
 
-## Deployment
+Available at `http://localhost:3000`.
 
-### Docker Deployment
+## Docker
 
-To build and run using Docker:
+Build and run from the **project root** (`streaming-service/`).
+
+`VITE_API_URL` must be provided at both build time (baked into the client bundle) and run time (used by the SSR server).
 
 ```bash
-docker build -t my-app .
+# Build
+docker build -f build/Dockerfile.frontend \
+  --build-arg VITE_API_URL=http://your-backend-host:port \
+  -t streaming-service-frontend \
+  frontend/
 
-# Run the container
-docker run -p 3000:3000 my-app
+# Run
+docker run --rm -p 3000:3000 \
+  -e VITE_API_URL=http://your-backend-host:port \
+  streaming-service-frontend
 ```
 
-The containerized application can be deployed to any platform that supports Docker, including:
+If the backend is on localhost, use `host.docker.internal` on Linux:
 
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
+```bash
+docker build -f build/Dockerfile.frontend \
+  --build-arg VITE_API_URL=http://host.docker.internal:8080 \
+  -t streaming-service-frontend \
+  frontend/
 
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
+docker run --rm -p 3000:3000 \
+  --add-host=host.docker.internal:host-gateway \
+  -e VITE_API_URL=http://host.docker.internal:8080 \
+  streaming-service-frontend
 ```
 
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+Available at `http://localhost:3000`.
