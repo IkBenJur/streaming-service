@@ -46,8 +46,9 @@ func (app *Application) Mount() http.Handler {
 
 	videoHandler := videos.NewHandler(app.Queries)
 	router.GET("/videos", videoHandler.ListVideos)
-	router.GET("/videos/:id", videoHandler.FindById)
-	router.GET("/videos/:id/is-status-finished", videoHandler.VideoStatusIsFinished)
+	videoGroup := router.Group("/videos/:id", videos.RequireVideo(app.Queries))
+	videoGroup.GET("", videoHandler.FindById)
+	videoGroup.GET("/is-status-finished", videoHandler.VideoStatusIsFinished)
 
 	if app.LocalStorage {
 		localStore := app.StorageClient.(*storage.LocalStorage)
