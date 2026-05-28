@@ -11,6 +11,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { Route } from "./+types/root";
 import { queryClient } from "~/lib/queryClient";
 import { initApiClient } from "~/lib/apiClient";
+import { BottomNav } from "~/components/BottomNav";
 // TODO: wire up real auth token
 import "./app.css";
 
@@ -38,6 +39,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <BottomNav />
     </QueryClientProvider>
   );
 }
