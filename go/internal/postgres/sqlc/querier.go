@@ -12,7 +12,6 @@ import (
 
 type Querier interface {
 	CreateVideo(ctx context.Context, arg CreateVideoParams) (pgtype.UUID, error)
-	FindStatusIdByName(ctx context.Context, status string) (pgtype.UUID, error)
 	FindVideoById(ctx context.Context, id pgtype.UUID) (Video, error)
 	ListVideos(ctx context.Context) ([]Video, error)
 	UpdateVideoProgress(ctx context.Context, arg UpdateVideoProgressParams) error

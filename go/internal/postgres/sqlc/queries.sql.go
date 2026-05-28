@@ -27,17 +27,6 @@ func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) (pgtyp
 	return id, err
 }
 
-const findStatusIdByName = `-- name: FindStatusIdByName :one
-SELECT id FROM video_statuses WHERE status = $1 LIMIT 1
-`
-
-func (q *Queries) FindStatusIdByName(ctx context.Context, status string) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, findStatusIdByName, status)
-	var id pgtype.UUID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const findVideoById = `-- name: FindVideoById :one
 SELECT id, status, progress, created_at, updated_at, file_extension FROM videos WHERE id = $1
 `

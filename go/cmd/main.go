@@ -45,11 +45,6 @@ func run(ctx context.Context) error {
 
 	queries := repo.New(conn)
 
-	if err := repo.LoadVideoStatuses(ctx, queries); err != nil {
-		slog.Error("Failed to load video statuses", "error", err)
-		return err
-	}
-
 	port := env.GetEnv("PORT", "8080")
 	runLocalStorage := env.GetEnvBool("RUN_LOCAL_STORAGE", false)
 

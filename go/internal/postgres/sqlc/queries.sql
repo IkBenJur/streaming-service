@@ -13,9 +13,6 @@ FROM videos video
 JOIN video_statuses vstatus ON vstatus.id = video.status
 WHERE video.id = $1 AND vstatus.status = 'pending';
 
--- name: FindStatusIdByName :one
-SELECT id FROM video_statuses WHERE status = $1 LIMIT 1;
-
 -- name: UpdateVideoStatus :exec
 UPDATE videos SET status = $2 WHERE id = $1;
 

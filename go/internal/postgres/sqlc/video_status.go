@@ -1,17 +1,8 @@
 package repo
 
 import (
-	"context"
-	"fmt"
-
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-)
-
-const (
-	videoStatusPending    = "pending"
-	videoStatusProcessing = "processing"
-	videoStatusFinished   = "finished"
-	videoStatusFailed     = "failed"
 )
 
 type videoStatusIDs struct {
@@ -21,35 +12,13 @@ type videoStatusIDs struct {
 	Failed     pgtype.UUID
 }
 
-var VideoStatuses videoStatusIDs
+var VideoStatuses = videoStatusIDs{
+	Pending:    mustUUID("00000000-0000-0000-0000-000000000001"),
+	Processing: mustUUID("00000000-0000-0000-0000-000000000002"),
+	Finished:   mustUUID("00000000-0000-0000-0000-000000000003"),
+	Failed:     mustUUID("00000000-0000-0000-0000-000000000004"),
+}
 
-func LoadVideoStatuses(ctx context.Context, q Querier) error {
-	pending, err := q.FindStatusIdByName(ctx, videoStatusPending)
-	if err != nil {
-		return fmt.Errorf("load pending status: %w", err)
-	}
-
-	processing, err := q.FindStatusIdByName(ctx, videoStatusProcessing)
-	if err != nil {
-		return fmt.Errorf("load processing status: %w", err)
-	}
-
-	finished, err := q.FindStatusIdByName(ctx, videoStatusFinished)
-	if err != nil {
-		return fmt.Errorf("load finished status: %w", err)
-	}
-
-	failed, err := q.FindStatusIdByName(ctx, videoStatusFailed)
-	if err != nil {
-		return fmt.Errorf("load failed status: %w", err)
-	}
-
-	VideoStatuses = videoStatusIDs{
-		Pending:    pending,
-		Processing: processing,
-		Finished:   finished,
-		Failed:     failed,
-	}
-
-	return nil
+func mustUUID(s string) pgtype.UUID {
+	return pgtype.UUID{Bytes: uuid.MustParse(s), Valid: true}
 }
