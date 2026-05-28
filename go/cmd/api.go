@@ -7,6 +7,7 @@ import (
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/storage"
+	"github.com/IkBenJur/streaming-service/internal/videos"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,6 +43,11 @@ func (app *Application) Mount() http.Handler {
 	router.POST("/videos/create-and-get-upload-url", storageHandler.CreateVideoAndGetUploadUrl)
 	router.POST("/videos/:id/process", storageHandler.SubmitVideoProcessJob)
 	router.GET("/videos/:id/stream/:file/signed-url", storageHandler.GetSegmentSignedUrl)
+
+	videoHandler := videos.NewHandler(app.Queries)
+	router.GET("/videos", videoHandler.ListVideos)
+	router.GET("/videos/:id", videoHandler.FindById)
+	router.GET("/videos/:id/is-status-finished", videoHandler.VideoStatusIsFinished)
 
 	if app.LocalStorage {
 		localStore := app.StorageClient.(*storage.LocalStorage)
