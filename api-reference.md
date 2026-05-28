@@ -8,7 +8,26 @@ Configured via environment. All routes are relative to the server root.
 
 ## Global Behavior
 
-All responses are JSON. CORS headers are set on every response, allowing any origin with `GET`, `POST`, and `PUT` methods. Preflight `OPTIONS` requests are handled automatically.
+All responses are JSON. CORS headers are set on every response, allowing any origin with `GET`, `POST`, and `PUT` methods, and `Content-Type` request headers. Preflight `OPTIONS` requests are handled automatically.
+
+---
+
+## Video Object
+
+Most video endpoints return a `Video` object with this shape:
+
+```json
+{
+  "id": "<uuid>",
+  "status": "<status-uuid>",
+  "progress": <integer or null>,
+  "created_at": "<timestamp or null>",
+  "updated_at": "<timestamp or null>",
+  "file_extension": "mp4 | webm"
+}
+```
+
+`status` is a UUID foreign key — see [Video Status Values](#video-status-values) for the mapping.
 
 ---
 
@@ -26,6 +45,78 @@ No request body. Returns a simple OK confirmation.
 ```json
 { "message": "OK" }
 ```
+
+---
+
+### List Videos
+
+```
+GET /videos
+```
+
+Returns all videos in the database.
+
+**Request body:** none
+
+**Response `200 OK`:** array of [Video objects](#video-object)
+
+```json
+[
+  {
+    "id": "<uuid>",
+    "status": "<status-uuid>",
+    "progress": 42,
+    "created_at": "<timestamp>",
+    "updated_at": "<timestamp>",
+    "file_extension": "mp4"
+  }
+]
+```
+
+---
+
+### Get Video by ID
+
+```
+GET /videos/:id
+```
+
+Returns a single video by its UUID.
+
+**URL params:**
+- `id` — UUID of the video
+
+**Request body:** none
+
+**Response `200 OK`:** [Video object](#video-object)
+
+**Error responses:**
+- `400 Bad Request` — invalid UUID format
+- `404 Not Found` — video not found
+
+---
+
+### Check if Video is Finished
+
+```
+GET /videos/:id/is-status-finished
+```
+
+Returns whether the video has reached `finished` status.
+
+**URL params:**
+- `id` — UUID of the video
+
+**Request body:** none
+
+**Response `200 OK`:**
+```json
+{ "video_is_finished": true }
+```
+
+**Error responses:**
+- `400 Bad Request` — invalid UUID format
+- `404 Not Found` — video not found
 
 ---
 
@@ -79,7 +170,7 @@ Triggers the transcoding pipeline for a video that has already been uploaded. Th
 ```
 
 **Error responses:**
-- `400 Bad Request` — invalid UUID format, or video is not in a valid state to start processing
+- `400 Bad Request` — invalid UUID format
 - `404 Not Found` — video not found, or uploaded file not found in storage
 - `409 Conflict` — video is not in `pending` status
 
@@ -106,7 +197,7 @@ Returns a short-lived presigned GET URL for a specific HLS segment or playlist f
 
 **Error responses:**
 - `400 Bad Request` — invalid UUID, video not finished, or invalid file path
-- `404 Not Found` — video not found
+- `404 Not Found` — video not found, or HLS file not found in storage
 
 ---
 
@@ -168,13 +259,14 @@ All error responses follow this structure:
 
 ## Video Status Values
 
-A video moves through these statuses during its lifecycle:
+A video moves through these statuses during its lifecycle. The `status` field on a Video object is the UUID, not the string label.
 
-| Status | Meaning |
-|--------|---------|
-| `pending` | Created, awaiting raw file upload and processing trigger |
-| `processing` | Transcoding job is running |
-| `finished` | HLS output is ready; streaming endpoints are available |
+| Status | UUID | Meaning |
+|--------|------|---------|
+| `pending` | `00000000-0000-0000-0000-000000000001` | Created, awaiting raw file upload and processing trigger |
+| `processing` | `00000000-0000-0000-0000-000000000002` | Transcoding job is running |
+| `finished` | `00000000-0000-0000-0000-000000000003` | HLS output is ready; streaming endpoints are available |
+| `failed` | `00000000-0000-0000-0000-000000000004` | Transcoding failed |
 
 Only `finished` videos can have their HLS segments fetched via the signed-URL endpoint.
 
@@ -185,6 +277,6 @@ Only `finished` videos can have their HLS segments fetched via the signed-URL en
 1. `POST /videos/create-and-get-upload-url` — get `id` and `upload-url`
 2. `PUT <upload-url>` — upload the raw file directly to storage using the presigned URL
 3. `POST /videos/:id/process` — trigger transcoding
-4. Poll or wait until video status is `finished`
+4. Poll `GET /videos/:id/is-status-finished` (or `GET /videos/:id`) until `video_is_finished` is `true`
 5. `GET /videos/:id/stream/index.m3u8/signed-url` — get a signed URL for the HLS playlist
 6. Feed the signed URL to an HLS-capable video player; player requests individual segments via subsequent calls to `GET /videos/:id/stream/:file/signed-url`

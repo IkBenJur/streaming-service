@@ -14,6 +14,12 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/.well-known/appspecific/com.chrome.devtools.json": {
+    params: {};
+  };
+  "/videos": {
+    params: {};
+  };
   "/videos/:id": {
     params: {
       "id": string;
@@ -24,11 +30,19 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/videos/:id";
+    page: "/" | "/.well-known/appspecific/com.chrome.devtools.json" | "/videos" | "/videos/:id";
+  };
+  "routes/devtools-probe.ts": {
+    id: "routes/devtools-probe";
+    page: "/.well-known/appspecific/com.chrome.devtools.json";
   };
   "routes/home.tsx": {
     id: "routes/home";
     page: "/";
+  };
+  "routes/videos.tsx": {
+    id: "routes/videos";
+    page: "/videos";
   };
   "routes/videos.$id.tsx": {
     id: "routes/videos.$id";
@@ -42,7 +56,9 @@ type RouteFiles = {
 
 type RouteModules = {
   "root": typeof import("./app/root.tsx");
+  "routes/devtools-probe": typeof import("./app/routes/devtools-probe.ts");
   "routes/home": typeof import("./app/routes/home.tsx");
+  "routes/videos": typeof import("./app/routes/videos.tsx");
   "routes/videos.$id": typeof import("./app/routes/videos.$id.tsx");
   "routes/_auth/layout": typeof import("./app/routes/_auth/layout.tsx");
 };
