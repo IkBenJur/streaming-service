@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"github.com/google/uuid"
+	"github.com/IkBenJur/streaming-service/internal/utils"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -13,12 +13,8 @@ type videoStatusIDs struct {
 }
 
 var VideoStatuses = videoStatusIDs{
-	Pending:    mustUUID("00000000-0000-0000-0000-000000000001"),
-	Processing: mustUUID("00000000-0000-0000-0000-000000000002"),
-	Finished:   mustUUID("00000000-0000-0000-0000-000000000003"),
-	Failed:     mustUUID("00000000-0000-0000-0000-000000000004"),
-}
-
-func mustUUID(s string) pgtype.UUID {
-	return pgtype.UUID{Bytes: uuid.MustParse(s), Valid: true}
+	Pending:    utils.MustUUID("00000000-0000-0000-0000-000000000001"),
+	Processing: utils.MustUUID("00000000-0000-0000-0000-000000000002"),
+	Finished:   utils.MustUUID("00000000-0000-0000-0000-000000000003"),
+	Failed:     utils.MustUUID("00000000-0000-0000-0000-000000000004"),
 }
