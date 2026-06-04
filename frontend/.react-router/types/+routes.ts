@@ -25,12 +25,15 @@ type Pages = {
       "id": string;
     };
   };
+  "/create-video": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/.well-known/appspecific/com.chrome.devtools.json" | "/videos" | "/videos/:id";
+    page: "/" | "/.well-known/appspecific/com.chrome.devtools.json" | "/videos" | "/videos/:id" | "/create-video";
   };
   "routes/devtools-probe.ts": {
     id: "routes/devtools-probe";
@@ -48,6 +51,10 @@ type RouteFiles = {
     id: "routes/videos.$id";
     page: "/videos/:id";
   };
+  "routes/create-video.tsx": {
+    id: "routes/create-video";
+    page: "/create-video";
+  };
   "routes/_auth/layout.tsx": {
     id: "routes/_auth/layout";
     page: never;
@@ -60,5 +67,6 @@ type RouteModules = {
   "routes/home": typeof import("./app/routes/home.tsx");
   "routes/videos": typeof import("./app/routes/videos.tsx");
   "routes/videos.$id": typeof import("./app/routes/videos.$id.tsx");
+  "routes/create-video": typeof import("./app/routes/create-video.tsx");
   "routes/_auth/layout": typeof import("./app/routes/_auth/layout.tsx");
 };

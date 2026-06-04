@@ -5,6 +5,7 @@ export default [
   index("routes/home.tsx"),
   route("videos", "routes/videos.tsx"),
   route("videos/:id", "routes/videos.$id.tsx"),
+  route("create-video", "routes/create-video.tsx"),
   layout("routes/_auth/layout.tsx", [
     // Protected routes go here
   ]),
