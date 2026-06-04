@@ -78,6 +78,7 @@ func run(ctx context.Context) error {
 	}
 
 	transcoder := videotranscoder.NewTranscoder(
+		ctx,
 		queries,
 		transcodeStorageClient,
 		env.GetEnvInt("TRANSCODE_JOB_NUMBER_OF_WORKERS", 2),

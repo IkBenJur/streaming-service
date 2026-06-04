@@ -29,13 +29,15 @@ type StorageClient interface {
 }
 
 type VideoTranscoder struct {
+	ctx context.Context
 	repo.Querier
 	storageClient StorageClient
 	semaphore     chan struct{}
 }
 
-func NewTranscoder(querier repo.Querier, storageClient StorageClient, maxNrOfWorkers int) *VideoTranscoder {
+func NewTranscoder(ctx context.Context, querier repo.Querier, storageClient StorageClient, maxNrOfWorkers int) *VideoTranscoder {
 	return &VideoTranscoder{
+		ctx:           ctx,
 		Querier:       querier,
 		storageClient: storageClient,
 		semaphore:     make(chan struct{}, maxNrOfWorkers),
@@ -44,17 +46,20 @@ func NewTranscoder(querier repo.Querier, storageClient StorageClient, maxNrOfWor
 
 func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 	go func() {
-		ctx := context.Background()
-		t.semaphore <- struct{}{}
+		select {
+		case t.semaphore <- struct{}{}:
+		case <-t.ctx.Done():
+			return
+		}
 		defer func() { <-t.semaphore }()
 
 		logger := slog.With("video_id", id)
 		logger.Info("transcode job start")
 
-		video, err := t.Querier.FindVideoById(ctx, id)
+		video, err := t.Querier.FindVideoById(t.ctx, id)
 		if err != nil {
 			// Most likely failed because does not exists. Does not hurt to try and set to failed
-			t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+			t.Querier.UpdateVideoStatus(context.Background(), repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
@@ -72,10 +77,10 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		key := t.storageClient.GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
 		filename := fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension)
 		rawFilepath := t.storageClient.GetRawFilePath(filename)
-		err = t.storageClient.DownloadFile(ctx, key, rawFilepath)
+		err = t.storageClient.DownloadFile(t.ctx, key, rawFilepath)
 		if err != nil {
 			logger.Error("transcode failed", "error", err)
-			t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+			t.Querier.UpdateVideoStatus(context.Background(), repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
@@ -84,9 +89,9 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		logger.Info("Getting file end")
 
 		logger.Info("transcode start")
-		if err = t.transcodeVideo(ctx, video); err != nil {
+		if err = t.transcodeVideo(t.ctx, video); err != nil {
 			logger.Error("failed to transcode", "error", err)
-			err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+			err = t.Querier.UpdateVideoStatus(context.Background(), repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
@@ -98,15 +103,15 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		logger.Info("transcode finished")
 
 		logger.Info("delete local file raw start")
-		if err = t.storageClient.DeleteRawLocalFile(ctx, rawFilepath); err != nil {
+		if err = t.storageClient.DeleteRawLocalFile(t.ctx, rawFilepath); err != nil {
 			logger.Error("failed to remove raw file", "error", err)
 		}
 		logger.Info("delete local file raw end")
 
 		logger.Info("HLS files upload start")
-		if err = t.uploadHLSFiles(ctx, fmt.Sprintf("%x", video.ID.Bytes)); err != nil {
+		if err = t.uploadHLSFiles(t.ctx, fmt.Sprintf("%x", video.ID.Bytes)); err != nil {
 			logger.Error("failed to upload HLS", "error", err)
-			err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+			err = t.Querier.UpdateVideoStatus(context.Background(), repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
@@ -117,7 +122,7 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		}
 		logger.Info("HLS files upload end")
 
-		if err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+		if err = t.Querier.UpdateVideoStatus(context.Background(), repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Finished,
 		}); err != nil {
@@ -197,14 +202,12 @@ scanLoop:
 		case "out_time_ms":
 			ms, _ := strconv.ParseInt(value, 10, 64)
 			progress := ms * 100 / int64(durationInUs)
-			err = t.Querier.UpdateVideoProgress(c,
+			// Update may fail but that shouldn't stop trancode job
+			_ = t.Querier.UpdateVideoProgress(c,
 				repo.UpdateVideoProgressParams{
 					ID:       video.ID,
 					Progress: pgtype.Int4{Int32: int32(progress), Valid: true},
 				})
-			if err != nil {
-				return fmt.Errorf("transcode failed at video progess update %s", err.Error())
-			}
 		case "progress":
 			if value == "end" {
 				break scanLoop
