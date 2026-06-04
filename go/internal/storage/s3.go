@@ -39,7 +39,7 @@ func (s3Storage *S3Storage) GenerateRawUploadUrl(ctx context.Context, key string
 		Bucket: aws.String(s3Storage.bucketName),
 		Key:    aws.String(key),
 	}, func(po *s3.PresignOptions) {
-		po.Expires = 1 * time.Hour
+		po.Expires = 15 * time.Minute
 	})
 
 	return req.URL, err
