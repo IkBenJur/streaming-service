@@ -51,34 +51,47 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 		logger := slog.With("video_id", id)
 		logger.Info("transcode job start")
 
+		video, err := t.Querier.FindVideoById(ctx, id)
+		if err != nil {
+			// Most likely failed because does not exists. Does not hurt to try and set to failed
+			t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+				ID:     id,
+				Status: repo.VideoStatuses.Failed,
+			})
+			logger.Error("transcode failed", "error", err)
+			return
+		}
+
 		// Update status to processing
 		t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 			ID:     id,
 			Status: repo.VideoStatuses.Processing,
 		})
 
-		video, err := t.Querier.FindVideoById(ctx, id)
-		if err != nil {
-			logger.Error(fmt.Sprintf("transcode failed %s", err.Error()))
-			return
-		}
-
 		logger.Info("Getting file start")
 		key := t.storageClient.GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
 		filename := fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension)
 		rawFilepath := t.storageClient.GetRawFilePath(filename)
-		t.storageClient.DownloadFile(ctx, key, rawFilepath)
+		err = t.storageClient.DownloadFile(ctx, key, rawFilepath)
+		if err != nil {
+			logger.Error("transcode failed", "error", err)
+			t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+				ID:     id,
+				Status: repo.VideoStatuses.Failed,
+			})
+			return
+		}
 		logger.Info("Getting file end")
 
 		logger.Info("transcode start")
 		if err = t.transcodeVideo(ctx, video); err != nil {
-			logger.Error(err.Error())
+			logger.Error("failed to transcode", "error", err)
 			err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
 			if err != nil {
-				logger.Error(fmt.Sprintf("failed to update video status %s", err.Error()))
+				logger.Error("failed to update video status", "error", err)
 			}
 			return
 		}
@@ -86,19 +99,19 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 
 		logger.Info("delete local file raw start")
 		if err = t.storageClient.DeleteRawLocalFile(ctx, rawFilepath); err != nil {
-			logger.Error(fmt.Sprintf("failed to remove raw file %s", err.Error()))
+			logger.Error("failed to remove raw file", "error", err)
 		}
 		logger.Info("delete local file raw end")
 
 		logger.Info("HLS files upload start")
 		if err = t.uploadHLSFiles(ctx, fmt.Sprintf("%x", video.ID.Bytes)); err != nil {
-			logger.Error(err.Error())
+			logger.Error("failed to upload HLS", "error", err)
 			err = t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
 				ID:     id,
 				Status: repo.VideoStatuses.Failed,
 			})
 			if err != nil {
-				logger.Error(fmt.Sprintf("failed to update video status %s", err.Error()))
+				logger.Error("failed to update video status %s", "error", err)
 			}
 			return
 		}
@@ -108,7 +121,7 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 			ID:     id,
 			Status: repo.VideoStatuses.Finished,
 		}); err != nil {
-			logger.Error(fmt.Sprintf("failed to update video status %s", err.Error()))
+			logger.Error("failed to update video status %s", "error", err)
 		}
 
 		logger.Info("transcode job end")
