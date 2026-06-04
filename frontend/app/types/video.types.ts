@@ -2,6 +2,11 @@ export interface SignedUrlResponse {
   signed_url: string;
 }
 
+export interface CreateVideoResponse {
+  id: string;
+  "upload-url": string;
+}
+
 export interface Video {
   id: string;
   status: string;
