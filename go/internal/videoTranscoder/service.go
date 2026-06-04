@@ -67,12 +67,6 @@ func (t *VideoTranscoder) Submit(id pgtype.UUID) {
 			return
 		}
 
-		// Update status to processing
-		t.Querier.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
-			ID:     id,
-			Status: repo.VideoStatuses.Processing,
-		})
-
 		logger.Info("Getting file start")
 		key := t.storageClient.GetRawKey(fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension))
 		filename := fmt.Sprintf("%x.%s", id.Bytes, video.FileExtension)

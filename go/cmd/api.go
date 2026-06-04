@@ -31,6 +31,11 @@ func (app *Application) restartLooseVideoProcessingJobs(ctx context.Context) {
 
 	slog.Info("Submitting new jobs", "count", len(videos))
 	for _, video := range videos {
+		// Update status to processing
+		app.Queries.UpdateVideoStatus(ctx, repo.UpdateVideoStatusParams{
+			ID:     video.ID,
+			Status: repo.VideoStatuses.Processing,
+		})
 		app.Transcoder.Submit(video.ID)
 		// Video submited reset the progress
 		app.Queries.UpdateVideoProgress(ctx, repo.UpdateVideoProgressParams{

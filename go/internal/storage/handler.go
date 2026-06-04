@@ -128,6 +128,12 @@ func (h *Handler) SubmitVideoProcessJob(c *gin.Context) {
 		return
 	}
 
+	// Update status to processing
+	h.Querier.UpdateVideoStatus(c, repo.UpdateVideoStatusParams{
+		ID:     id,
+		Status: repo.VideoStatuses.Processing,
+	})
+
 	h.transcoder.Submit(video.ID)
 
 	json.WriteSucces(c, http.StatusOK, "processing job submitted")
