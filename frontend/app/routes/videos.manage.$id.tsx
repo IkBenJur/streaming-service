@@ -127,7 +127,7 @@ export default function ManageVideoPage() {
 
           {isFinished && (
             <Button asChild size="lg" className="self-start">
-              <Link to={`/videos/${id}`}>Watch video</Link>
+              <Link to={`/watch/video/${id}`}>Watch video</Link>
             </Button>
           )}
         </CardContent>

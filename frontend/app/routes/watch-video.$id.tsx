@@ -5,7 +5,7 @@ export function meta() {
   return [{ title: "Watch Video" }];
 }
 
-export default function VideoPage() {
+export default function WatchVideoPage() {
   const { id } = useParams();
   if (!id) return null;
 

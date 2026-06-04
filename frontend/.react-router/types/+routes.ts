@@ -25,7 +25,7 @@ type Pages = {
       "id": string;
     };
   };
-  "/videos/:id": {
+  "/watch/video/:id": {
     params: {
       "id": string;
     };
@@ -38,7 +38,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/.well-known/appspecific/com.chrome.devtools.json" | "/videos" | "/videos/manage/:id" | "/videos/:id" | "/create-video";
+    page: "/" | "/.well-known/appspecific/com.chrome.devtools.json" | "/videos" | "/videos/manage/:id" | "/watch/video/:id" | "/create-video";
   };
   "routes/devtools-probe.ts": {
     id: "routes/devtools-probe";
@@ -56,9 +56,9 @@ type RouteFiles = {
     id: "routes/videos.manage.$id";
     page: "/videos/manage/:id";
   };
-  "routes/videos.$id.tsx": {
-    id: "routes/videos.$id";
-    page: "/videos/:id";
+  "routes/watch-video.$id.tsx": {
+    id: "routes/watch-video.$id";
+    page: "/watch/video/:id";
   };
   "routes/create-video.tsx": {
     id: "routes/create-video";
@@ -76,7 +76,7 @@ type RouteModules = {
   "routes/home": typeof import("./app/routes/home.tsx");
   "routes/videos": typeof import("./app/routes/videos.tsx");
   "routes/videos.manage.$id": typeof import("./app/routes/videos.manage.$id.tsx");
-  "routes/videos.$id": typeof import("./app/routes/videos.$id.tsx");
+  "routes/watch-video.$id": typeof import("./app/routes/watch-video.$id.tsx");
   "routes/create-video": typeof import("./app/routes/create-video.tsx");
   "routes/_auth/layout": typeof import("./app/routes/_auth/layout.tsx");
 };

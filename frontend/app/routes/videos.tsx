@@ -14,7 +14,7 @@ function IconPlay({ className }: { className?: string }) {
 
 function VideoCard({ video, index, total }: { video: Video; index: number; total: number }) {
   return (
-    <Link to={`/videos/${video.id}`} className="block no-underline group">
+    <Link to={`/watch/video/${video.id}`} className="block no-underline group">
       <div className="relative w-full aspect-[16/10] rounded-[14px] overflow-hidden border border-border bg-[oklch(0.19_0.005_250)]">
         <span className="absolute top-2.5 left-2.5 sm:top-3.5 sm:left-3.5 font-mono text-[9px] sm:text-[10px] tracking-[0.16em] uppercase text-muted-foreground">
           {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
