@@ -28,6 +28,18 @@ Grouped by urgency, then difficulty within each group.
 
 ---
 
+## Medium — security
+
+| # | Task | Difficulty | Notes |
+|---|------|------------|-------|
+| 24 | **Auth on upload endpoint** | Hard | `POST /videos/create-and-get-upload-url` is open to anyone; gate it behind the auth middleware (item 22) |
+| 25 | **Switch presigned PUT → presigned POST with `content-length-range`** | Medium | S3 presigned POST supports a policy condition that caps upload size; presigned PUT has no equivalent — S3 will reject oversized uploads at the edge. Requires changing `GenerateRawUploadUrl` in `storage/s3.go` and the upload logic in the frontend |
+| 26 | **Enforce `Content-Type` on presigned upload URL** | Easy | Pass `ContentType: "video/mp4"` or `"video/webm"` in `PutObjectInput` so S3 rejects non-video uploads; client must send a matching `Content-Type` header |
+| 27 | **Rate limit upload URL generation per user/IP** | Medium | Add a Gin middleware that caps how many upload URLs a single user (or IP before auth) can request per hour; prevents quota abuse by legitimate accounts |
+| 28 | **S3 lifecycle policy to expire unprocessed raw files** | Easy | Add a lifecycle rule on the `raw/` prefix to delete objects older than 24h; limits damage from abuse that slips through and keeps storage costs down |
+
+---
+
 ## Low — future features
 
 | # | Task | Difficulty | Notes |
