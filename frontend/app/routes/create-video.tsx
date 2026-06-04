@@ -1,9 +1,11 @@
 import { useRef } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "~/components/ui/card";
+import { useCreateVideoMutation } from "~/hooks/mutations/useCreateVideo";
 
 function IconUpload({ className }: { className?: string }) {
   return (
@@ -28,11 +30,16 @@ export default function CreateVideoPage() {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<CreateVideoForm>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileRegistration = register("file", { required: "File is required", validate: (files) => files?.length > 0 || "File is required" });
+  const { mutate: createVideo, isPending, error } = useCreateVideoMutation();
+  const navigate = useNavigate();
 
   const selectedFile = watch("file")?.[0];
 
   function onSubmit(data: CreateVideoForm) {
-    console.log(data);
+    createVideo(
+      { title: data.title, file: data.file[0] },
+      { onSuccess: (id) => navigate(`/videos/manage/${id}`) },
+    );
   }
 
   return (
@@ -90,8 +97,13 @@ export default function CreateVideoPage() {
             </div>
           </form>
         </CardContent>
-        <CardFooter className="px-5 pb-6 sm:px-8 sm:pb-8">
-          <Button type="submit" form="create-video-form" size="lg" className="ml-auto">Upload</Button>
+        <CardFooter className="px-5 pb-6 sm:px-8 sm:pb-8 flex-col items-end gap-3">
+          {error && (
+            <span className="text-sm text-destructive self-stretch">{error.message}</span>
+          )}
+          <Button type="submit" form="create-video-form" size="lg" disabled={isPending}>
+            {isPending ? "Uploading…" : "Upload"}
+          </Button>
         </CardFooter>
       </Card>
     </div>

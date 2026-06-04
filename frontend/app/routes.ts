@@ -4,6 +4,7 @@ export default [
   route(".well-known/appspecific/com.chrome.devtools.json", "routes/devtools-probe.ts"),
   index("routes/home.tsx"),
   route("videos", "routes/videos.tsx"),
+  route("videos/manage/:id", "routes/videos.manage.$id.tsx"),
   route("videos/:id", "routes/videos.$id.tsx"),
   route("create-video", "routes/create-video.tsx"),
   layout("routes/_auth/layout.tsx", [

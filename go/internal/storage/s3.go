@@ -141,7 +141,7 @@ func (s3Storage *S3Storage) EnsureCORSPolicy(ctx context.Context) error {
 			CORSRules: []types.CORSRule{
 				{
 					AllowedHeaders: []string{"*"},
-					AllowedMethods: []string{"GET"},
+					AllowedMethods: []string{"GET", "PUT"},
 					AllowedOrigins: []string{"*"},
 					MaxAgeSeconds:  aws.Int32(3600),
 				},

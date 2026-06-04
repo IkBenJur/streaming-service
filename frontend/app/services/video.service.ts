@@ -2,6 +2,10 @@ import { apiClient } from "~/lib/apiClient";
 import type { CreateVideoResponse, SignedUrlResponse, Video } from "~/types/video.types";
 
 export const videoService = {
+  getVideo(id: string): Promise<Video> {
+    return apiClient().get<Video>(`/videos/${id}`);
+  },
+
   listVideos(): Promise<Video[]> {
     return apiClient().get<Video[]>("/videos");
   },
