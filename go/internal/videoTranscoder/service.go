@@ -162,7 +162,7 @@ func (t *VideoTranscoder) transcodeVideo(c context.Context, video repo.Video) er
 		"ffmpeg",
 		"-i", filepath,
 		"-progress", "pipe:1",
-		"-loglevel", "error",
+		"-loglevel", "warning",
 		"-c:v", "libx264",
 		"-c:a", "aac",
 		"-f", "hls",
