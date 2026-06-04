@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	repo "github.com/IkBenJur/streaming-service/internal/postgres/sqlc"
 	"github.com/IkBenJur/streaming-service/internal/storage"
 	"github.com/IkBenJur/streaming-service/internal/videos"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Application struct {
@@ -17,6 +19,26 @@ type Application struct {
 	Transcoder    storage.Transcoder
 	StorageClient storage.StorageClient
 	LocalStorage  bool
+}
+
+func (app *Application) restartLooseVideoProcessingJobs(ctx context.Context) {
+	slog.Info("Restarting loose jobs")
+	videos, err := app.Queries.ListVideosByStatus(ctx, repo.VideoStatuses.Processing)
+	if err != nil {
+		slog.Error("Error restart, list videos", "error", err)
+		return
+	}
+
+	slog.Info("Submitting new jobs", "count", len(videos))
+	for _, video := range videos {
+		app.Transcoder.Submit(video.ID)
+		// Video submited reset the progress
+		app.Queries.UpdateVideoProgress(ctx, repo.UpdateVideoProgressParams{
+			ID:       video.ID,
+			Progress: pgtype.Int4{Int32: 0, Valid: true},
+		})
+	}
+	slog.Info("Done restart")
 }
 
 func (app *Application) Mount() http.Handler {
@@ -62,6 +84,8 @@ func (app *Application) Mount() http.Handler {
 }
 
 func (app *Application) Run(ctx context.Context, router http.Handler) error {
+	app.restartLooseVideoProcessingJobs(ctx)
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", app.Port),
 		Handler: router,

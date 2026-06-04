@@ -76,6 +76,37 @@ func (q *Queries) ListVideos(ctx context.Context) ([]Video, error) {
 	return items, nil
 }
 
+const listVideosByStatus = `-- name: ListVideosByStatus :many
+SELECT id, status, progress, created_at, updated_at, file_extension FROM videos WHERE status = $1
+`
+
+func (q *Queries) ListVideosByStatus(ctx context.Context, status pgtype.UUID) ([]Video, error) {
+	rows, err := q.db.Query(ctx, listVideosByStatus, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Video
+	for rows.Next() {
+		var i Video
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.Progress,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FileExtension,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateVideoProgress = `-- name: UpdateVideoProgress :exec
 UPDATE videos SET progress = $2 WHERE id = $1
 `

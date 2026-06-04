@@ -18,3 +18,6 @@ UPDATE videos SET status = $2 WHERE id = $1;
 
 -- name: UpdateVideoProgress :exec
 UPDATE videos SET progress = $2 WHERE id = $1;
+
+-- name: ListVideosByStatus :many
+SELECT * FROM videos WHERE status = $1;
